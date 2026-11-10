@@ -1,0 +1,11 @@
+name = "newsfeed-snapshot"
+main = "index.js"
+compatibility_date = "2026-11-09"
+workers_dev = true
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[r2_buckets]]
+binding = "NEWS_SNAPSHOT_BUCKET"
+bucket_name = "worldcup-data"

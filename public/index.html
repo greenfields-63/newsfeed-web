@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Newsfeed is a real-time breaking news aggregator and commentary platform bringing together live global headlines from trusted publishers around the world." />
+  <title>Newsfeed - Realtime Breaking News & Commentary</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2976678829712042" crossorigin="anonymous"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              500: '#0284c7',
+              600: '#0284c7',
+              700: '#0369a1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body.min-h-screen {
+      font-family: 'Inter', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+    .signal-summary::-webkit-details-marker {
+      display: none;
+    }
+    .signal-preview {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+    .ticker-headline {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+    @media (min-width: 640px) {
+      .ticker-headline {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+    @media (min-width: 1280px) {
+      body {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+      }
+      #desktop-layout {
+        flex: 1 1 0%;
+        min-height: 0;
+        overflow: hidden;
+      }
+      #news-feed {
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Top Header Navigation Bar -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-2">
+
+      <!-- Brand Logo & Title -->
+      <div class="flex min-w-0 flex-1 items-center space-x-3">
+        <div class="hidden sm:flex w-10 h-10 shrink-0 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 items-center justify-center shadow-lg shadow-sky-500/20">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-white flex items-center gap-2 whitespace-nowrap">
+            Newsfeed
+          </h1>
+          <div class="flex items-center space-x-2 mt-0.5">
+            <p id="last-updated-text" class="max-w-[145px] truncate text-[10px] sm:max-w-none sm:text-xs text-slate-400 font-medium">Updating news...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Controls -->
+      <div class="flex shrink-0 items-center space-x-1 sm:space-x-2">
+        <!-- Install PWA Button (Hidden by default until prompt) -->
+        <button id="btn-install" class="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-300 bg-sky-900/40 border border-sky-700/50 hover:bg-sky-800/60 transition">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Install App
+        </button>
+
+        <!-- Refresh / Update Now Button -->
+        <button id="btn-refresh" title="Update Now" aria-label="Update Now" class="px-2.5 sm:px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs transition flex items-center space-x-2 shadow-lg shadow-sky-600/20 active:scale-95">
+          <svg id="icon-refresh" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          <span class="hidden sm:inline">Update Now</span>
+        </button>
+
+        <!-- View Mode Toggle Button (Tiles / Ticker) -->
+        <button id="btn-view-toggle" title="Toggle Layout (Ticker / Tiles)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60 active:scale-95 flex items-center justify-center">
+          <svg id="icon-view-tiles" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+          </svg>
+          <svg id="icon-view-ticker" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+
+        <!-- Favorites Button -->
+        <button id="btn-settings" title="Choose News Favorites" aria-label="Choose News Favorites" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60 active:scale-95 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Chips Scrollbar -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 overflow-x-auto custom-scrollbar flex items-center space-x-2 border-t border-slate-800/60" id="filter-bar">
+      <!-- Generated dynamically by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content and Wide-Screen Ad Previews -->
+  <div id="desktop-layout" class="mx-auto flex w-full max-w-7xl flex-1 px-3 sm:px-6">
+  <main id="news-feed" class="mx-auto w-full max-w-7xl min-w-0 px-1 py-6 pb-24 sm:px-0 sm:pb-6">
+    <section id="signals-section" class="hidden mb-4 rounded-2xl border border-amber-500/30 bg-slate-900/70 p-3 sm:p-4 shadow-lg">
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
+        <div>
+          <h2 class="text-base font-extrabold tracking-tight text-amber-300">Seth’s Signals</h2>
+          <p class="hidden sm:block mt-1 text-xs text-slate-400">Independent analysis—not reported news.</p>
+        </div>
+        <span class="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200">Commentary</span>
+      </div>
+      <div id="signals-list" class="max-h-40 space-y-2 overflow-y-auto overscroll-contain pr-1 custom-scrollbar sm:max-h-64"></div>
+    </section>
+
+    <!-- Status / Loading Indicator -->
+    <div id="loading-state" class="flex flex-col items-center justify-center py-20 text-center">
+      <div class="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p class="text-base font-semibold text-slate-200">Fetching breaking news & translating feeds...</p>
+      <p class="text-xs text-slate-400 mt-1">Checking Ynet, CNN, Israel Hayom, JPost, Al Arabiya & more</p>
+    </div>
+
+    <!-- Headlines Grid View -->
+    <div id="headlines-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Generated dynamically by app.js -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden flex-col items-center justify-center py-20 text-center bg-slate-900/40 rounded-2xl border border-slate-800">
+      <svg class="w-12 h-12 text-slate-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+      <h3 class="text-lg font-bold text-slate-200">No Headlines Available</h3>
+      <p class="text-sm text-slate-400 mt-1 max-w-sm">Please select at least one news source or click refresh to check for live stories.</p>
+      <button onclick="document.getElementById('btn-settings').click()" class="mt-4 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-xl text-sm transition">
+        Choose News Favorites
+      </button>
+    </div>
+    <footer class="mt-10 border-t border-slate-800 py-6 text-xs text-slate-400">
+      <nav aria-label="Site information" class="flex flex-wrap gap-x-5 gap-y-2">
+        <a class="hover:text-sky-300" href="/about.html">About</a>
+        <a class="hover:text-sky-300" href="/editorial.html">Editorial Standards</a>
+        <a class="hover:text-sky-300" href="/privacy.html">Privacy</a>
+        <a class="hover:text-sky-300" href="/contact.html">Contact</a>
+      </nav>
+      <p class="mt-3">Headlines link to their original publishers. Newsfeed is independent and is not affiliated with the publishers listed.</p>
+    </footer>
+  </main>
+  </div>
+
+  <!-- Sources Settings Modal -->
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-y-auto sm:overflow-hidden flex flex-col max-h-[90vh]">
+
+      <!-- Modal Header -->
+      <div class="shrink-0 p-5 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-white">Choose Your News Favorites</h2>
+          <p id="sources-count-text" class="text-xs text-slate-400">Manage active sources</p>
+        </div>
+        <button id="btn-modal-close" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Centered All / None Buttons -->
+      <div class="shrink-0 px-5 py-3 border-b border-slate-800/80 bg-slate-900/60 flex items-center justify-center space-x-3">
+        <button id="btn-select-all" class="px-4 py-1.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition active:scale-95">
+          Select All
+        </button>
+        <button id="btn-deselect-all" class="px-4 py-1.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition active:scale-95">
+          Deselect All
+        </button>
+      </div>
+
+      <label class="shrink-0 flex items-center space-x-3 px-5 py-3 border-b border-slate-800/80 cursor-pointer hover:bg-slate-800/40">
+        <input id="show-signals-toggle" type="checkbox" class="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700 focus:ring-amber-500">
+        <span class="flex-1">
+          <span class="block text-sm font-semibold text-slate-200">Show Seth’s Signals</span>
+          <span class="block text-xs text-slate-400">Display independent commentary above the headlines</span>
+        </span>
+      </label>
+
+      <label for="headline-language" class="shrink-0 flex items-center justify-between gap-4 px-5 py-3 border-b border-slate-800/80">
+        <span>
+          <span class="block text-sm font-semibold text-slate-200">Headline language</span>
+          <span class="block text-xs text-slate-400">Choose translated or original headlines</span>
+        </span>
+        <select id="headline-language" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+          <option value="en">English</option>
+          <option value="es">Spanish (Español)</option>
+          <option value="he">Hebrew (עברית)</option>
+          <option value="ar">Arabic (العربية)</option>
+          <option value="zh-CN">Chinese (Simplified) (简体中文)</option>
+          <option value="ja">Japanese (日本語)</option>
+          <option value="ru">Russian (Русский)</option>
+          <option value="pt">Portuguese (Português)</option>
+          <option value="fr">French (Français)</option>
+          <option value="none">None (original languages)</option>
+        </select>
+      </label>
+
+      <label class="shrink-0 flex items-center space-x-3 px-5 py-3 border-b border-slate-800/80 cursor-pointer hover:bg-slate-800/40">
+        <input id="open-article-translated-toggle" type="checkbox" class="w-4 h-4 rounded text-sky-600 bg-slate-950 border-slate-700 focus:ring-sky-500">
+        <span class="flex-1">
+          <span class="block text-sm font-semibold text-slate-200">Open articles in selected language</span>
+          <span class="block text-xs text-slate-400">Use Google Translate when opening an article</span>
+        </span>
+      </label>
+
+      <!-- Sources List -->
+      <div class="p-4 flex-none space-y-2 sm:flex-1 sm:overflow-y-auto custom-scrollbar" id="sources-list-container">
+        <!-- Generated dynamically by app.js -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="shrink-0 p-4 border-t border-slate-800 bg-slate-900/90 flex justify-end">
+        <button id="btn-modal-apply" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-sky-600/20 active:scale-95">
+          Done & Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Script -->
+  <script src="/app.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW registration failed:', err));
+    }
+  </script>
+</body>
+</html>

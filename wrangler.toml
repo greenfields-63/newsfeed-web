@@ -1,0 +1,7 @@
+name = "newsfeed-web"
+pages_build_output_dir = "./public"
+compatibility_date = "2024-01-01"
+
+[[r2_buckets]]
+binding = "NEWS_SNAPSHOT_BUCKET"
+bucket_name = "worldcup-data"
