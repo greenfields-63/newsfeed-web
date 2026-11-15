@@ -471,7 +471,7 @@ function scheduleNextNewsRefresh() {
 
   const intervalMs = 5 * 60 * 1000;
   const publishGraceMs = 60 * 1000;
-  const publishRetryMs = 10 * 1000;
+  const publishRetryMs = 6 * 1000;
   const now = Date.now();
   const currentTick = Math.floor(now / intervalMs) * intervalMs;
   const snapshotTime = Date.parse(lastSnapshotGeneratedAt || '');
@@ -480,7 +480,7 @@ function scheduleNextNewsRefresh() {
   const nextTick = (Math.floor(now / intervalMs) + 1) * intervalMs;
   const refreshAt = publishIsPending
     ? Math.min(now + publishRetryMs, currentTick + publishGraceMs)
-    : nextTick + 5 * 1000;
+    : nextTick + 8 * 1000;
   newsRefreshTimeout = setTimeout(() => {
     newsRefreshTimeout = null;
     refreshNews();
