@@ -1,17 +1,20 @@
 // GIST DYNAMIC SOURCES ENDPOINT
 const GIST_SOURCES_URL = "https://gist.githubusercontent.com/greenfields-63/8382753efbedb6e5f1b812aad04233d4/raw/sources.json";
-const RENDER_BACKEND_URL = "https://worldcup-odds-backend.onrender.com";
 const NEWS_SNAPSHOT_URL = "/api/news-snapshot";
-const SIGNALS_API_URL = `${RENDER_BACKEND_URL}/api/signals`;
 
 // DEFAULT FALLBACK SOURCES DEFINITION
 const DEFAULT_SOURCES = [
   { id: "infobae", name: "Infobae", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Ainfobae.com&hl=es-419&gl=AR&ceid=AR%3Aes-419", language: "es", color: "#E91E63", country: "Argentina" },
   { id: "caixin", name: "Caixin Global", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20source%3ACaixin&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#D32F2F", country: "China" },
+  { id: "the_paper", name: "The Paper (澎湃新闻)", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Athepaper.cn&hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans", language: "zh", color: "#D32F2F", country: "China" },
+  { id: "rtve", name: "RTVE", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Artve.es&hl=es&gl=ES&ceid=ES%3Aes", language: "es", color: "#1565C0", country: "Spain" },
   { id: "scmp", name: "South China Morning Post", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Ascmp.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#C62828", country: "China" },
   { id: "xinhua", name: "Xinhua News", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Axinhuanet.com&hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans", language: "zh", color: "#B71C1C", country: "China" },
+  { id: "abc_australia", name: "ABC News Australia", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Aabc.net.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen", language: "en", color: "#0097A7", country: "Australia" },
+  { id: "sbs", name: "SBS News", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen", language: "en", color: "#5D4037", country: "Australia" },
   { id: "mercopress", name: "MercoPress", feedUrl: "https://en.mercopress.com/rss/", language: "en", color: "#00838F", country: "Global" },
   { id: "reuters", name: "Reuters", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Areuters.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#F57C00", country: "Global" },
+  { id: "france24", name: "France 24", feedUrl: "https://www.france24.com/fr/rss", language: "fr", color: "#1565C0", country: "France" },
   { id: "israel_hayom", name: "Israel Hayom", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Aisraelhayom.co.il&hl=he&gl=IL&ceid=IL%3Ahe", language: "he", color: "#C2185B", country: "Israel" },
   { id: "inn", name: "Israel National News", feedUrl: "https://www.israelnationalnews.com/Rss.aspx", language: "en", color: "#1976D2", country: "Israel" },
   { id: "jpost", name: "Jerusalem Post", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20source%3AJerusalem%20Post&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#0288D1", country: "Israel" },
@@ -21,6 +24,8 @@ const DEFAULT_SOURCES = [
   { id: "ria", name: "RIA Novosti", feedUrl: "https://ria.ru/export/rss2/index.xml", language: "ru", color: "#1565C0", country: "Russia" },
   { id: "tass", name: "TASS", feedUrl: "https://tass.com/rss/v2.xml", language: "en", color: "#0D47A1", country: "Russia" },
   { id: "al_arabiya", name: "Al Arabiya", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20%22Al%20Arabiya%22&hl=ar&gl=SA&ceid=SA%3Aar", language: "ar", color: "#2E7D32", country: "Saudi Arabia" },
+  { id: "al_akhbar", name: "Al-Akhbar", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Aal-akhbar.com&hl=ar&gl=LB&ceid=LB%3Aar", language: "ar", color: "#2E7D32", country: "Lebanon" },
+  { id: "an_nahar", name: "An-Nahar", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Aannahar.com&hl=ar&gl=LB&ceid=LB%3Aar", language: "ar", color: "#1565C0", country: "Lebanon" },
   { id: "bbc", name: "BBC News", feedUrl: "http://feeds.bbci.co.uk/news/rss.xml", language: "en", color: "#880E4F", country: "United Kingdom" },
   { id: "sky", name: "Sky News", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Anews.sky.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#455A64", country: "United Kingdom" },
   { id: "abc", name: "ABC News", feedUrl: "https://abcnews.go.com/abcnews/topstories", language: "en", color: "#0097A7", country: "United States" },
@@ -29,6 +34,7 @@ const DEFAULT_SOURCES = [
   { id: "cbs", name: "CBS News", feedUrl: "https://www.cbsnews.com/latest/rss/main", language: "en", color: "#388E3C", country: "United States" },
   { id: "cnn", name: "CNN", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Acnn.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#B71C1C", country: "United States" },
   { id: "fox", name: "Fox News", feedUrl: "https://moxie.foxnews.com/google-publisher/latest.xml", language: "en", color: "#0D47A1", country: "United States" },
+  { id: "amar_ujala", name: "Amar Ujala", feedUrl: "https://www.amarujala.com/rss/india-news.xml", language: "hi", color: "#FF9933", country: "India" },
   { id: "nbc", name: "NBC News", feedUrl: "https://feeds.nbcnews.com/nbcnews/public/news", language: "en", color: "#7B1FA2", country: "United States" }
 ];
 
@@ -56,7 +62,10 @@ const savedHeadlineLanguage = localStorage.getItem('newsfeed_headline_language')
 let headlineLanguage = Object.hasOwn(headlineLanguageOptions, savedHeadlineLanguage) ? savedHeadlineLanguage : 'en';
 let headlineTranslationRequest = 0;
 let selectedFilterId = null;
+let selectedFilterCountry = null;
 let isRefreshing = false;
+let newsRefreshTimeout = null;
+let lastSnapshotGeneratedAt = localStorage.getItem('newsfeed_last_snapshot_generated_at');
 let deferredInstallPrompt = null;
 
 // DOM ELEMENTS
@@ -90,15 +99,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateViewToggleIcons();
   await loadSourcesFromGist();
   renderFilterBar();
-  refreshSignals();
-  setInterval(refreshSignals, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshNews();
+    }
+  });
   if (cachedHeadlines.length > 0) {
     renderHeadlines();
   }
   refreshNews();
-
-  // Auto-refresh every 5 minutes
-  setInterval(refreshNews, 5 * 60 * 1000);
+  scheduleNextNewsRefresh();
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   if (btnInstall) {
@@ -130,23 +140,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-async function refreshSignals() {
-      if (!signalsSection || !signalsList || !showSignals) {
-        updateSignalsVisibility();
-        return;
-      }
-
-      try {
-        const response = await fetch(SIGNALS_API_URL, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = await response.json();
-        const signals = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload.signals)
-            ? payload.signals
-            : null;
-        if (!signals) throw new Error('Invalid signals response');
-
+function renderSignals(signals) {
+      if (!signalsSection || !signalsList || !Array.isArray(signals)) return;
         const expandedSignalIds = new Set(
           [...signalsList.querySelectorAll('details[open]')].map(card => card.dataset.signalId)
         );
@@ -223,12 +218,6 @@ async function refreshSignals() {
         signalsList.scrollTop = previousScrollTop;
 
         updateSignalsVisibility();
-      } catch (error) {
-        signalsSection.classList.add('hidden');
-        if (!/HTTP 404/.test(error.message || '')) {
-          console.warn('Seth’s Signals could not be loaded:', error.message);
-        }
-      }
 }
 
 function updateSignalsVisibility() {
@@ -255,10 +244,41 @@ async function loadSourcesFromGist() {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        ALL_SOURCES = data.sort((a, b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
+        const gistIds = new Set(data.map(source => source.id));
+        const supplementalSources = DEFAULT_SOURCES.filter(
+          source => ['the_paper', 'rtve', 'abc_australia', 'sbs', 'al_akhbar', 'an_nahar'].includes(source.id) && !gistIds.has(source.id)
+        );
+        ALL_SOURCES = [...data, ...supplementalSources]
+          .sort((a, b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
         const savedIds = JSON.parse(localStorage.getItem('newsfeed_enabled_sources') || '[]');
         if (savedIds.length > 0) {
           enabledSourceIds = new Set(savedIds);
+          if (localStorage.getItem('newsfeed_the_paper_enabled_v1') !== 'true') {
+            enabledSourceIds.add('the_paper');
+            savePreferences();
+            localStorage.setItem('newsfeed_the_paper_enabled_v1', 'true');
+          }
+          if (localStorage.getItem('newsfeed_rtve_enabled_v1') !== 'true') {
+            enabledSourceIds.add('rtve');
+            savePreferences();
+            localStorage.setItem('newsfeed_rtve_enabled_v1', 'true');
+          }
+          for (const sourceId of ['abc_australia', 'sbs']) {
+            const migrationKey = `newsfeed_${sourceId}_enabled_v1`;
+            if (localStorage.getItem(migrationKey) !== 'true') {
+              enabledSourceIds.add(sourceId);
+              savePreferences();
+              localStorage.setItem(migrationKey, 'true');
+            }
+          }
+          for (const sourceId of ['al_akhbar', 'an_nahar']) {
+            const migrationKey = `newsfeed_${sourceId}_enabled_v1`;
+            if (localStorage.getItem(migrationKey) !== 'true') {
+              enabledSourceIds.add(sourceId);
+              savePreferences();
+              localStorage.setItem(migrationKey, 'true');
+            }
+          }
         } else {
           enabledSourceIds = new Set(ALL_SOURCES.map(s => s.id));
         }
@@ -272,7 +292,6 @@ async function loadSourcesFromGist() {
 // EVENT LISTENERS
 function refreshAll() {
   refreshNews();
-  refreshSignals();
 }
 
 btnRefresh.addEventListener('click', refreshAll);
@@ -304,7 +323,6 @@ showSignalsToggle.addEventListener('change', () => {
   showSignals = showSignalsToggle.checked;
   localStorage.setItem('newsfeed_show_signals', String(showSignals));
   updateSignalsVisibility();
-  if (showSignals) refreshSignals();
 });
 headlineLanguageSelect.addEventListener('change', () => {
   headlineLanguage = Object.hasOwn(headlineLanguageOptions, headlineLanguageSelect.value)
@@ -329,14 +347,14 @@ headlineLanguageSelect.addEventListener('change', () => {
     displayTitle: item.originalTitle,
     isTranslated: false
   }));
-  cachedHeadlines = originalHeadlines;
-  renderHeadlines();
-  translateItemsForLanguage(originalHeadlines, targetLanguage).then(translatedHeadlines => {
-    if (requestId !== headlineTranslationRequest || targetLanguage !== headlineLanguage) return;
-    cachedHeadlines = translatedHeadlines;
-    saveHeadlines();
-    renderHeadlines();
-  });
+  void translateItemsForLanguage(originalHeadlines, targetLanguage)
+    .then(translatedHeadlines => {
+      if (requestId !== headlineTranslationRequest || targetLanguage !== headlineLanguage) return;
+      cachedHeadlines = translatedHeadlines;
+      saveHeadlines();
+      renderHeadlines();
+    })
+    .catch(error => console.warn('Could not translate headlines:', error));
 });
 openArticleTranslatedToggle.addEventListener('change', () => {
   openArticlesTranslated = openArticleTranslatedToggle.checked;
@@ -372,22 +390,14 @@ async function refreshNews() {
   }
 
   const activeSources = ALL_SOURCES.filter(s => enabledSourceIds.has(s.id));
-  if (activeSources.length === 0) {
-    cachedHeadlines = [];
-    saveHeadlines();
-    renderHeadlines();
-    isRefreshing = false;
-    iconRefresh.classList.remove('animate-spin');
-    return;
-  }
-
   try {
-    const response = await fetch(NEWS_SNAPSHOT_URL, { cache: 'no-store' });
+    const response = await fetch(NEWS_SNAPSHOT_URL);
     if (!response.ok) throw new Error(`News snapshot returned HTTP ${response.status}`);
     const snapshot = await response.json();
     if (!snapshot.feeds || typeof snapshot.feeds !== 'object') {
       throw new Error('News snapshot has an invalid format');
     }
+    if (Array.isArray(snapshot.signals)) renderSignals(snapshot.signals);
 
     const allItems = activeSources.flatMap(source => {
       const feed = snapshot.feeds[source.id];
@@ -404,33 +414,27 @@ async function refreshNews() {
       return parseXmlFeed(feed.xml, source);
     });
 
-    let translationRequestId = ++headlineTranslationRequest;
-    let translationLanguage = headlineLanguage;
-    let translatedItems = await translateItemsForLanguage(allItems, translationLanguage);
-    while (translationLanguage !== headlineLanguage || translationRequestId !== headlineTranslationRequest) {
-      translationRequestId = ++headlineTranslationRequest;
-      translationLanguage = headlineLanguage;
-      translatedItems = await translateItemsForLanguage(allItems, translationLanguage);
-    }
-
-    // Filter within last 3 hours, sort strictly chronological descending, take up to 100
-    const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
-    const seenIds = new Set();
-    const sortedHeadlines = translatedItems
-      .filter(item => {
-        if (seenIds.has(item.id)) return false;
-        seenIds.add(item.id);
-        return item.pubDate >= threeHoursAgo;
-      })
-      .sort((a, b) => b.pubDate - a.pubDate)
-      .slice(0, 250);
-
-    cachedHeadlines = sortedHeadlines;
-    saveHeadlines();
-
     const snapshotDate = new Date(snapshot.generatedAt);
     const updatedAt = Number.isNaN(snapshotDate.getTime()) ? new Date() : snapshotDate;
     lastUpdatedText.textContent = `Snapshot updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    if (!Number.isNaN(snapshotDate.getTime())) {
+      lastSnapshotGeneratedAt = snapshotDate.toISOString();
+      localStorage.setItem('newsfeed_last_snapshot_generated_at', lastSnapshotGeneratedAt);
+    }
+
+    const translationRequestId = ++headlineTranslationRequest;
+    const translationLanguage = headlineLanguage;
+    void translateItemsForLanguage(allItems, translationLanguage)
+      .then(translatedItems => {
+        if (
+          translationRequestId !== headlineTranslationRequest ||
+          translationLanguage !== headlineLanguage
+        ) return;
+        cachedHeadlines = filterRecentHeadlines(translatedItems);
+        saveHeadlines();
+        renderHeadlines();
+      })
+      .catch(error => console.warn('Could not translate headlines:', error));
   } catch (err) {
     console.error('Could not load the latest news snapshot:', err);
   } finally {
@@ -439,7 +443,42 @@ async function refreshNews() {
     loadingState.classList.add('hidden');
     renderFilterBar();
     renderHeadlines();
+    scheduleNextNewsRefresh();
   }
+}
+
+function filterRecentHeadlines(items) {
+  const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
+  const seenIds = new Set();
+  return items
+    .filter(item => {
+      if (seenIds.has(item.id)) return false;
+      seenIds.add(item.id);
+      return item.pubDate >= threeHoursAgo;
+    })
+    .sort((a, b) => b.pubDate - a.pubDate)
+    .slice(0, 250);
+}
+
+function scheduleNextNewsRefresh() {
+  if (newsRefreshTimeout !== null) clearTimeout(newsRefreshTimeout);
+
+  const intervalMs = 5 * 60 * 1000;
+  const publishGraceMs = 60 * 1000;
+  const publishRetryMs = 10 * 1000;
+  const now = Date.now();
+  const currentTick = Math.floor(now / intervalMs) * intervalMs;
+  const snapshotTime = Date.parse(lastSnapshotGeneratedAt || '');
+  const publishIsPending = now - currentTick < publishGraceMs &&
+    (!Number.isFinite(snapshotTime) || snapshotTime < currentTick);
+  const nextTick = (Math.floor(now / intervalMs) + 1) * intervalMs;
+  const refreshAt = publishIsPending
+    ? Math.min(now + publishRetryMs, currentTick + publishGraceMs)
+    : nextTick + 5 * 1000;
+  newsRefreshTimeout = setTimeout(() => {
+    newsRefreshTimeout = null;
+    refreshNews();
+  }, refreshAt - Date.now());
 }
 
 // PARSE RSS XML
@@ -572,6 +611,11 @@ function renderHeadlines() {
   let itemsToDisplay = cachedHeadlines;
   if (selectedFilterId) {
     itemsToDisplay = cachedHeadlines.filter(item => item.sourceId === selectedFilterId);
+  } else if (selectedFilterCountry) {
+    const countrySourceIds = new Set(
+      ALL_SOURCES.filter(source => source.country === selectedFilterCountry).map(source => source.id)
+    );
+    itemsToDisplay = cachedHeadlines.filter(item => countrySourceIds.has(item.sourceId));
   }
 
   if (itemsToDisplay.length === 0) {
@@ -697,11 +741,13 @@ function openArticle(item) {
     return;
   }
 
-  const articleTab = window.open('about:blank', '_blank');
+  const articleTab = window.open(articleUrl, '_blank');
   if (!articleTab) return;
   articleTab.opener = null;
 
-  fetch(`/api/resolve-google-news-article?url=${encodeURIComponent(articleUrl)}`)
+  fetch(`/api/resolve-google-news-article?url=${encodeURIComponent(articleUrl)}`, {
+    signal: AbortSignal.timeout(8000)
+  })
     .then(response => {
       if (!response.ok) throw new Error(`Article URL resolver returned HTTP ${response.status}`);
       return response.json();
@@ -712,8 +758,7 @@ function openArticle(item) {
       articleTab.location.replace(targetUrl);
     })
     .catch(error => {
-      console.warn('Could not resolve Google News article; opening the original link without Google Translate:', error);
-      articleTab.location.replace(articleUrl);
+      console.warn('Could not resolve Google News article for translation; leaving the original article link open:', error);
     });
 }
 
@@ -727,6 +772,7 @@ function renderFilterBar() {
   allBtn.textContent = `All (${activeSources.length})`;
   allBtn.onclick = () => {
     selectedFilterId = null;
+    selectedFilterCountry = null;
     renderFilterBar();
     renderHeadlines();
   };
@@ -750,10 +796,18 @@ function renderFilterBar() {
     const groupDiv = document.createElement('div');
     groupDiv.className = 'flex items-center space-x-1.5 shrink-0';
 
-    const label = document.createElement('span');
-    label.className = 'text-[10px] font-extrabold text-sky-400 uppercase tracking-wider mr-1';
-    label.textContent = country + ':';
-    groupDiv.appendChild(label);
+    const countryBtn = document.createElement('button');
+    const isCountrySelected = selectedFilterCountry === country;
+    countryBtn.className = `px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${isCountrySelected ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-800/80 text-sky-300 hover:bg-slate-700'}`;
+    countryBtn.textContent = `${country} (${grouped[country].length})`;
+    countryBtn.setAttribute('aria-pressed', String(isCountrySelected));
+    countryBtn.onclick = () => {
+      selectedFilterCountry = isCountrySelected ? null : country;
+      selectedFilterId = null;
+      renderFilterBar();
+      renderHeadlines();
+    };
+    groupDiv.appendChild(countryBtn);
 
     grouped[country].forEach(source => {
       const btn = document.createElement('button');
@@ -765,6 +819,7 @@ function renderFilterBar() {
       `;
       btn.onclick = () => {
         selectedFilterId = isSelected ? null : source.id;
+        selectedFilterCountry = null;
         renderFilterBar();
         renderHeadlines();
       };

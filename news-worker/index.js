@@ -1,9 +1,75 @@
 const SNAPSHOT_GIST_URL =
   "https://gist.githubusercontent.com/greenfields-63/8382753efbedb6e5f1b812aad04233d4/raw/sources.json";
-const SNAPSHOT_KEY = "newsfeed/cloudflare-news-snapshot.json";
+const LEGACY_SNAPSHOT_KEY = "newsfeed/cloudflare-news-snapshot.json";
+const SNAPSHOT_KEYS = {
+  core: "newsfeed/cloudflare-news-snapshot-core.json",
+  google: "newsfeed/cloudflare-news-snapshot-google.json",
+  regional: "newsfeed/cloudflare-news-snapshot-regional.json",
+  published: "newsfeed/cloudflare-news-snapshot-published.json"
+};
 const RENDER_BACKEND_URL = "https://worldcup-odds-backend.onrender.com";
 const TASS_FEED_URL =
   "https://news.google.com/rss/search?q=when%3A3h%20site%3Atass.com&hl=en-US&gl=US&ceid=US%3Aen";
+const THE_PAPER_SOURCE = {
+  id: "the_paper",
+  name: "The Paper (澎湃新闻)",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Athepaper.cn&hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans",
+  language: "zh",
+  color: "#D32F2F",
+  country: "China"
+};
+const RTVE_SOURCE = {
+  id: "rtve",
+  name: "RTVE",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Artve.es&hl=es&gl=ES&ceid=ES%3Aes",
+  language: "es",
+  color: "#1565C0",
+  country: "Spain"
+};
+const ABC_AUSTRALIA_SOURCE = {
+  id: "abc_australia",
+  name: "ABC News Australia",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Aabc.net.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen",
+  language: "en",
+  color: "#0097A7",
+  country: "Australia"
+};
+const SBS_SOURCE = {
+  id: "sbs",
+  name: "SBS News",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen",
+  language: "en",
+  color: "#5D4037",
+  country: "Australia"
+};
+const AL_AKHBAR_SOURCE = {
+  id: "al_akhbar",
+  name: "Al-Akhbar",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Aal-akhbar.com&hl=ar&gl=LB&ceid=LB%3Aar",
+  language: "ar",
+  color: "#2E7D32",
+  country: "Lebanon"
+};
+const AN_NAHAR_SOURCE = {
+  id: "an_nahar",
+  name: "An-Nahar",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Aannahar.com&hl=ar&gl=LB&ceid=LB%3Aar",
+  language: "ar",
+  color: "#1565C0",
+  country: "Lebanon"
+};
+const SUPPLEMENTAL_SOURCES = [
+  THE_PAPER_SOURCE,
+  RTVE_SOURCE,
+  ABC_AUSTRALIA_SOURCE,
+  SBS_SOURCE,
+  AL_AKHBAR_SOURCE,
+  AN_NAHAR_SOURCE
+];
+const AUSTRALIA_SOURCE_IDS = new Set(["abc_australia", "sbs"]);
+const LEBANON_SOURCE_IDS = new Set(["al_akhbar", "an_nahar"]);
+const REGIONAL_SOURCE_IDS = new Set([...AUSTRALIA_SOURCE_IDS, ...LEBANON_SOURCE_IDS]);
+const GOOGLE_NEWS_HOST = "news.google.com";
 const FEED_URL_OVERRIDES = {
   abc: "https://abcnews.com/abcnews/topstories",
   bloomberg: "https://www.bloomberg.com/feeds/politics/news.rss",
@@ -29,7 +95,9 @@ const ALLOWED_HOSTS = new Set([
   "www.cbsnews.com",
   "moxie.foxnews.com",
   "feeds.nbcnews.com",
-  "www.cnn.com"
+  "www.cnn.com",
+  "www.france24.com",
+  "www.amarujala.com"
 ]);
 
 export default {
@@ -39,20 +107,38 @@ export default {
       return new Response("Not found", { status: 404 });
     }
 
-    const object = await env.NEWS_SNAPSHOT_BUCKET.get(SNAPSHOT_KEY);
+    const object = await env.NEWS_SNAPSHOT_BUCKET.get(getSnapshotKey(env));
     return Response.json({
       ok: true,
+      group: env.SNAPSHOT_GROUP || "core",
+      snapshotKey: getSnapshotKey(env),
       snapshotAvailable: Boolean(object),
       generatedAt: object?.customMetadata?.generatedAt || null
     });
   },
 
   async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(refreshSnapshot(env));
+    ctx.waitUntil(refreshSnapshot(env, _controller.scheduledTime));
   }
 };
 
-async function refreshSnapshot(env) {
+function getSnapshotKey(env) {
+  const group = env.SNAPSHOT_GROUP || "core";
+  const key = SNAPSHOT_KEYS[group];
+  if (!key) throw new Error(`Unknown snapshot group: ${group}`);
+  return key;
+}
+
+function getSourceFeedHost(source) {
+  try {
+    return new URL(FEED_URL_OVERRIDES[source.id] || source.feedUrl).hostname;
+  } catch {
+    return "";
+  }
+}
+
+async function refreshSnapshot(env, scheduledTime = Date.now()) {
+  const group = env.SNAPSHOT_GROUP || "core";
   const gistResponse = await fetch(SNAPSHOT_GIST_URL, {
     headers: { Accept: "application/json" }
   });
@@ -60,10 +146,15 @@ async function refreshSnapshot(env) {
     throw new Error(`Could not load source Gist: HTTP ${gistResponse.status}`);
   }
 
-  const sources = await gistResponse.json();
-  if (!Array.isArray(sources)) {
+  const gistSources = await gistResponse.json();
+  if (!Array.isArray(gistSources)) {
     throw new Error("Source Gist must contain an array");
   }
+  const gistIds = new Set(gistSources.map(source => source?.id));
+  const sources = [
+    ...gistSources,
+    ...SUPPLEMENTAL_SOURCES.filter(source => !gistIds.has(source.id))
+  ];
 
   const validSources = sources.filter(source =>
     source &&
@@ -77,14 +168,27 @@ async function refreshSnapshot(env) {
   if (new Set(validSources.map(source => source.id)).size !== validSources.length) {
     throw new Error("Source Gist contains duplicate source IDs");
   }
+  const sourcesToFetch = validSources.filter(source => {
+    if (group === "regional") return REGIONAL_SOURCE_IDS.has(source.id);
+    if (group === "google") {
+      return getSourceFeedHost(source) === GOOGLE_NEWS_HOST &&
+        !REGIONAL_SOURCE_IDS.has(source.id);
+    }
+    return !REGIONAL_SOURCE_IDS.has(source.id) &&
+      getSourceFeedHost(source) !== GOOGLE_NEWS_HOST;
+  });
+  if (!sourcesToFetch.length) {
+    throw new Error("No sources matched this snapshot refresh");
+  }
 
-  const previousObject = await env.NEWS_SNAPSHOT_BUCKET.get(SNAPSHOT_KEY);
+  const snapshotKey = getSnapshotKey(env);
+  const previousObject = await env.NEWS_SNAPSHOT_BUCKET.get(snapshotKey);
   const previousSnapshot = previousObject
     ? await previousObject.json()
     : null;
   const previousFeeds = previousSnapshot?.feeds || {};
 
-  const results = await mapWithLimit(validSources, 4, async source => {
+  const results = await mapWithLimit(sourcesToFetch, sourcesToFetch.length, async source => {
     try {
       const feedUrl = FEED_URL_OVERRIDES[source.id] || source.feedUrl;
       const xml = source.id === "cnn"
@@ -99,29 +203,31 @@ async function refreshSnapshot(env) {
     }
   });
 
-  const now = new Date().toISOString();
-  const feeds = {};
-  const errors = {};
+  const fetchedAt = new Date().toISOString();
+  const generatedAt = new Date(scheduledTime + 60_000).toISOString();
+  const feeds = { ...previousFeeds };
+  const errors = { ...(previousSnapshot?.errors || {}) };
   for (const result of results) {
     if (result.xml) {
-      feeds[result.id] = { xml: result.xml, fetchedAt: now };
+      feeds[result.id] = { xml: result.xml, fetchedAt };
+      delete errors[result.id];
     } else {
       if (previousFeeds[result.id]) feeds[result.id] = previousFeeds[result.id];
       errors[result.id] = `${result.error}; retaining previous copy when available`;
     }
   }
 
-  const snapshot = { generatedAt: now, feeds, errors };
-  await env.NEWS_SNAPSHOT_BUCKET.put(SNAPSHOT_KEY, JSON.stringify(snapshot), {
+  const snapshot = { generatedAt, feeds, errors };
+  await env.NEWS_SNAPSHOT_BUCKET.put(snapshotKey, JSON.stringify(snapshot), {
     httpMetadata: {
       contentType: "application/json; charset=utf-8",
       cacheControl: "public, max-age=0, s-maxage=60, stale-while-revalidate=240"
     },
-    customMetadata: { generatedAt: now }
+    customMetadata: { generatedAt }
   });
 
   console.log(
-    `Snapshot saved to R2: ${results.filter(result => result.xml).length}/${validSources.length} feeds successful`
+    `Snapshot saved to R2: ${results.filter(result => result.xml).length}/${sourcesToFetch.length} feeds successful`
   );
 }
 

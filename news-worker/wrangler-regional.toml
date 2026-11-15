@@ -1,0 +1,14 @@
+name = "newsfeed-snapshot-regional"
+main = "index.js"
+compatibility_date = "2026-11-09"
+workers_dev = true
+
+[triggers]
+crons = ["4-59/5 * * * *"]
+
+[vars]
+SNAPSHOT_GROUP = "regional"
+
+[[r2_buckets]]
+binding = "NEWS_SNAPSHOT_BUCKET"
+bucket_name = "worldcup-data"
