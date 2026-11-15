@@ -391,7 +391,7 @@ async function refreshNews() {
 
   const activeSources = ALL_SOURCES.filter(s => enabledSourceIds.has(s.id));
   try {
-    const response = await fetch(NEWS_SNAPSHOT_URL);
+    const response = await fetch(`${NEWS_SNAPSHOT_URL}?_t=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`News snapshot returned HTTP ${response.status}`);
     const snapshot = await response.json();
     if (!snapshot.feeds || typeof snapshot.feeds !== 'object') {
