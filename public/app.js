@@ -422,11 +422,7 @@ async function refreshNews() {
       localStorage.setItem('newsfeed_last_snapshot_generated_at', lastSnapshotGeneratedAt);
     }
 
-    cachedHeadlines = filterRecentHeadlines(allItems.map(item => ({
-      ...item,
-      displayTitle: item.originalTitle,
-      isTranslated: false
-    })));
+    cachedHeadlines = filterRecentHeadlines(allItems.map(item => getSynchronousItem(item, headlineLanguage)));
     saveHeadlines();
     renderHeadlines();
 
@@ -553,6 +549,35 @@ function normalizeFeedDates(items) {
 
 // TRANSLATION ENGINE (Google Translate Free GTX Endpoint + LocalStorage Cache)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
+
+function getSynchronousItem(item, targetLanguage) {
+  if (!item.originalTitle) return { ...item, displayTitle: '', isTranslated: false };
+  const sourceLanguage = (item.language || '').toLowerCase().split('-')[0];
+  const targetLanguageCode = (targetLanguage || '').toLowerCase().split('-')[0];
+  if (targetLanguage === 'none' || sourceLanguage === targetLanguageCode) {
+    return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+  }
+
+  const cacheKey = `${item.language}_${targetLanguage}_${item.originalTitle}`;
+  if (translationCache[cacheKey]) {
+    return {
+      ...item,
+      displayTitle: translationCache[cacheKey],
+      isTranslated: translationCache[cacheKey].toLowerCase() !== item.originalTitle.toLowerCase()
+    };
+  }
+
+  const existing = cachedHeadlines.find(h => h.id === item.id);
+  if (existing && existing.displayTitle) {
+    return {
+      ...item,
+      displayTitle: existing.displayTitle,
+      isTranslated: Boolean(existing.isTranslated)
+    };
+  }
+
+  return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+}
 
 async function translateItemIfNeeded(item, targetLanguage) {
   if (!item.originalTitle) return item;
