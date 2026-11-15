@@ -422,19 +422,29 @@ async function refreshNews() {
       localStorage.setItem('newsfeed_last_snapshot_generated_at', lastSnapshotGeneratedAt);
     }
 
+    cachedHeadlines = filterRecentHeadlines(allItems.map(item => ({
+      ...item,
+      displayTitle: item.originalTitle,
+      isTranslated: false
+    })));
+    saveHeadlines();
+    renderHeadlines();
+
     const translationRequestId = ++headlineTranslationRequest;
     const translationLanguage = headlineLanguage;
-    void translateItemsForLanguage(allItems, translationLanguage)
-      .then(translatedItems => {
-        if (
-          translationRequestId !== headlineTranslationRequest ||
-          translationLanguage !== headlineLanguage
-        ) return;
-        cachedHeadlines = filterRecentHeadlines(translatedItems);
-        saveHeadlines();
-        renderHeadlines();
-      })
-      .catch(error => console.warn('Could not translate headlines:', error));
+    if (translationLanguage !== 'none') {
+      void translateItemsForLanguage(allItems, translationLanguage)
+        .then(translatedItems => {
+          if (
+            translationRequestId !== headlineTranslationRequest ||
+            translationLanguage !== headlineLanguage
+          ) return;
+          cachedHeadlines = filterRecentHeadlines(translatedItems);
+          saveHeadlines();
+          renderHeadlines();
+        })
+        .catch(error => console.warn('Could not translate headlines:', error));
+    }
   } catch (err) {
     console.error('Could not load the latest news snapshot:', err);
   } finally {

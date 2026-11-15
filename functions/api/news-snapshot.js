@@ -5,7 +5,7 @@ const PARTITION_SNAPSHOT_KEYS = [
   "newsfeed/cloudflare-news-snapshot-google.json",
   "newsfeed/cloudflare-news-snapshot-regional.json"
 ];
-const SNAPSHOT_CACHE_CONTROL = "public, max-age=0, s-maxage=30, stale-while-revalidate=300";
+const SNAPSHOT_CACHE_CONTROL = "public, max-age=0, s-maxage=5, stale-while-revalidate=60";
 
 export async function onRequestGet({ env }) {
   const bucket = env.NEWS_SNAPSHOT_BUCKET;
