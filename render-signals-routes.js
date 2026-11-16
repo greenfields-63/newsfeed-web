@@ -358,7 +358,15 @@ async function loadSourcesHealth(){
     table.style.fontSize = '14px';
 
     const thead = document.createElement('thead');
-    thead.innerHTML = \`<tr style="border-bottom: 1px solid #334155; text-align: left; color: #94a3b8;"><th style="padding: 8px;">Source</th><th style="padding: 8px;">Country</th><th style="padding: 8px;">Last Update</th><th style="padding: 8px;">Status</th></tr>\`;
+    const headerRow = document.createElement('tr');
+    headerRow.style.cssText = 'border-bottom: 1px solid #334155; text-align: left; color: #94a3b8;';
+    ['Source', 'Country', 'Last Update', 'Status'].forEach(text => {
+      const th = document.createElement('th');
+      th.style.padding = '8px';
+      th.textContent = text;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
@@ -366,12 +374,28 @@ async function loadSourcesHealth(){
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid #1e293b';
 
-      const dateStr = src.latestArticleDate ? new Date(src.latestArticleDate).toLocaleString() : 'No articles';
-      const statusBadge = src.isStale
-        ? \`<span style="background:#b91c1c; color:white; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px;">Stale >48h</span>\`
-        : \`<span style="background:#15803d; color:white; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px;">Active</span>\`;
+      const tdName = document.createElement('td');
+      tdName.style.cssText = 'padding: 8px; font-weight: 600; color: #f8fafc;';
+      tdName.textContent = src.name;
 
-      tr.innerHTML = \`<td style="padding: 8px; font-weight:600; color:#f8fafc;">\${escapeHtml(src.name)}</td><td style="padding: 8px; color:#94a3b8;">\${escapeHtml(src.country)}</td><td style="padding: 8px; color:#cbd5e1;">\${dateStr}</td><td style="padding: 8px;">\${statusBadge}</td>\`;
+      const tdCountry = document.createElement('td');
+      tdCountry.style.cssText = 'padding: 8px; color: #94a3b8;';
+      tdCountry.textContent = src.country;
+
+      const tdDate = document.createElement('td');
+      tdDate.style.cssText = 'padding: 8px; color: #cbd5e1;';
+      tdDate.textContent = src.latestArticleDate ? new Date(src.latestArticleDate).toLocaleString() : 'No articles';
+
+      const tdStatus = document.createElement('td');
+      tdStatus.style.padding = '8px';
+      const badge = document.createElement('span');
+      badge.textContent = src.isStale ? 'Stale >48h' : 'Active';
+      badge.style.cssText = src.isStale
+        ? 'background: #b91c1c; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 12px;'
+        : 'background: #15803d; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 12px;';
+      tdStatus.appendChild(badge);
+
+      tr.append(tdName, tdCountry, tdDate, tdStatus);
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);
