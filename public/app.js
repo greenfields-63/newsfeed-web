@@ -514,6 +514,7 @@ function parseXmlFeed(xmlText, source) {
 
     if (title) {
       const pubDate = parseDate(pubDateStr);
+      const translatedTitle = cleanText(node.querySelector('translatedTitle')?.textContent || '');
       result.push({
         id: `${source.id}_${hashString(guid)}`,
         sourceId: source.id,
@@ -521,6 +522,7 @@ function parseXmlFeed(xmlText, source) {
         sourceColor: source.color,
         language: source.language,
         originalTitle: title,
+        translatedTitle: translatedTitle || null,
         displayTitle: title,
         link: link.trim(),
         pubDate: pubDate,
@@ -556,6 +558,14 @@ function getSynchronousItem(item, targetLanguage) {
   const targetLanguageCode = (targetLanguage || '').toLowerCase().split('-')[0];
   if (targetLanguage === 'none' || sourceLanguage === targetLanguageCode) {
     return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+  }
+
+  if ((targetLanguageCode === 'en' || targetLanguage === 'en-US') && item.translatedTitle) {
+    return {
+      ...item,
+      displayTitle: item.translatedTitle,
+      isTranslated: true
+    };
   }
 
   const cacheKey = `${item.language}_${targetLanguage}_${item.originalTitle}`;
