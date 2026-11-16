@@ -1,66 +1,4 @@
-// Seth's Signals routes. Paste into the Render backend's index.js above app.listen().
-// Requires the existing `app`, `s3`, and `PutObjectCommand` definitions.
-const { GetObjectCommand: GetObjCmd } = require("@aws-sdk/client-s3");
-const { randomUUID, timingSafeEqual } = require("node:crypto");
-
-const SIGNALS_BUCKET = process.env.R2_BUCKET_NAME;
-const SIGNALS_OBJECT_KEY = "newsfeed/signals.json";
-const SIGNALS_TOKEN = process.env.SIGNALS_ADMIN_TOKEN;
-
-if (typeof app !== 'undefined' && app._router && !app._router.stack.some(r => r.route && r.route.path === '/api/admin/sources-health')) {
-
-function signalsAdminAuthorized(req, res, next) {
-  if (!SIGNALS_TOKEN || SIGNALS_TOKEN.length < 32) {
-    return res.status(503).json({ error: "Signals admin is not configured" });
-  }
-
-  const provided = req.get("authorization") || "";
-  const match = provided.match(/^Bearer ([^\s]+)$/);
-  if (!match) return res.status(401).json({ error: "Unauthorized" });
-
-  const expectedBuffer = Buffer.from(SIGNALS_TOKEN);
-  const providedBuffer = Buffer.from(match[1]);
-  if (
-    expectedBuffer.length !== providedBuffer.length ||
-    !timingSafeEqual(expectedBuffer, providedBuffer)
-  ) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  next();
-}
-
-async function readSignals() {
-  if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
-
-  try {
-    const object = await s3.send(new GetObjCmd({
-      Bucket: SIGNALS_BUCKET,
-      Key: SIGNALS_OBJECT_KEY,
-    }));
-    const contents = await object.Body.transformToString();
-    const parsed = JSON.parse(contents);
-    if (!Array.isArray(parsed)) throw new Error("Stored signals data is invalid");
-    return parsed;
-  } catch (error) {
-    if (error.name === "NoSuchKey" || error.$metadata?.httpStatusCode === 404) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-async function writeSignals(signals) {
-  if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
-  await s3.send(new PutObjectCommand({
-    Bucket: SIGNALS_BUCKET,
-    Key: SIGNALS_OBJECT_KEY,
-    Body: JSON.stringify(signals),
-    ContentType: "application/json",
-    CacheControl: "no-cache",
-  }));
-}
-
+// Source Health Monitor extension for Seth's Signals admin. Paste above app.listen().
 const SOURCE_METADATA_ADMIN = [
   { id: "infobae", name: "Infobae", country: "Argentina" },
   { id: "caixin", name: "Caixin Global", country: "China" },
@@ -96,12 +34,12 @@ const SOURCE_METADATA_ADMIN = [
   { id: "nbc", name: "NBC News", country: "United States" }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
-app.get("/api/admin/sources-health", signalsAdminAuthorized, async (req, res) => {
+app.get("/api/admin/sources-health", authorizeSignalsAdmin, async (req, res) => {
   try {
     if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
     let snapshot = { feeds: {} };
     try {
-      const obj = await s3.send(new GetObjCmd({
+      const obj = await s3.send(new GetObjectCommand({
         Bucket: SIGNALS_BUCKET,
         Key: "newsfeed/cloudflare-news-snapshot-published.json"
       }));
@@ -134,131 +72,7 @@ app.get("/api/admin/sources-health", signalsAdminAuthorized, async (req, res) =>
   }
 });
 
-function validateSignalInput(body) {
-  if (!body || typeof body.text !== "string" || !body.text.trim()) {
-    return { error: "Signal text is required" };
-  }
-  const text = body.text.trim();
-  if (text.length > 2000) return { error: "Signal text must be 2,000 characters or fewer" };
-
-  if (body.status !== "draft" && body.status !== "published") {
-    return { error: "Status must be draft or published" };
-  }
-
-  if (body.links !== undefined && !Array.isArray(body.links)) {
-    return { error: "Links must be an array" };
-  }
-  const rawLinks = body.links || [];
-  if (rawLinks.length > 5) return { error: "A signal can include up to five links" };
-
-  const links = [];
-  for (const rawLink of rawLinks) {
-    if (!rawLink || typeof rawLink.url !== "string") {
-      return { error: "Each link needs a URL" };
-    }
-    let url;
-    try {
-      url = new URL(rawLink.url);
-    } catch {
-      return { error: "A link URL is invalid" };
-    }
-    if (url.protocol !== "https:") return { error: "Links must use HTTPS" };
-
-    const title = typeof rawLink.title === "string" ? rawLink.title.trim().slice(0, 160) : "";
-    links.push({ title, url: url.href });
-  }
-
-  return { value: { text, links, status: body.status } };
-}
-
-app.get("/api/signals", async (req, res) => {
-  try {
-    const signals = await readSignals();
-    const published = signals
-      .filter(signal => signal.status === "published" && !signal.id?.startsWith("audit-"))
-      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-    return res
-      .set("Cache-Control", "public, max-age=30")
-      .json({ signals: published });
-  } catch (error) {
-    console.error("Could not read Seth's Signals:", error.message);
-    return res.status(500).json({ error: "Signals are temporarily unavailable" });
-  }
-});
-
-app.get("/api/admin/signals", signalsAdminAuthorized, async (req, res) => {
-  try {
-    const signals = await readSignals();
-    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
-    return res.json({ signals: cleanSignals });
-  } catch (error) {
-    console.error("Could not read admin signals:", error.message);
-    return res.status(500).json({ error: "Signals are temporarily unavailable" });
-  }
-});
-
-app.post("/api/admin/signals", signalsAdminAuthorized, async (req, res) => {
-  const validated = validateSignalInput(req.body);
-  if (validated.error) return res.status(400).json({ error: validated.error });
-
-  try {
-    const now = new Date().toISOString();
-    const signal = {
-      id: randomUUID(),
-      ...validated.value,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const signals = await readSignals();
-    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
-    cleanSignals.push(signal);
-    await writeSignals(cleanSignals);
-    return res.status(201).json({ signal });
-  } catch (error) {
-    console.error("Could not create signal:", error.message);
-    return res.status(500).json({ error: "Could not save signal" });
-  }
-});
-
-app.put("/api/admin/signals/:id", signalsAdminAuthorized, async (req, res) => {
-  const validated = validateSignalInput(req.body);
-  if (validated.error) return res.status(400).json({ error: validated.error });
-
-  try {
-    const signals = await readSignals();
-    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
-    const index = cleanSignals.findIndex(signal => signal.id === req.params.id);
-    if (index === -1) return res.status(404).json({ error: "Signal not found" });
-
-    cleanSignals[index] = {
-      ...cleanSignals[index],
-      ...validated.value,
-      updatedAt: new Date().toISOString(),
-    };
-    await writeSignals(cleanSignals);
-    return res.json({ signal: cleanSignals[index] });
-  } catch (error) {
-    console.error("Could not update signal:", error.message);
-    return res.status(500).json({ error: "Could not save signal" });
-  }
-});
-
-app.delete("/api/admin/signals/:id", signalsAdminAuthorized, async (req, res) => {
-  try {
-    const signals = await readSignals();
-    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
-    const updated = cleanSignals.filter(signal => signal.id !== req.params.id);
-    if (updated.length === cleanSignals.length) {
-      return res.status(404).json({ error: "Signal not found" });
-    }
-    await writeSignals(updated);
-    return res.sendStatus(204);
-  } catch (error) {
-    console.error("Could not delete signal:", error.message);
-    return res.status(500).json({ error: "Could not delete signal" });
-  }
-});
-
+// Update signals-admin HTML to include the Source Health Monitor table
 app.get("/signals-admin", (req, res) => {
   res.type("html").send(`<!doctype html>
 <html lang="en">
@@ -281,71 +95,157 @@ app.get("/signals-admin", (req, res) => {
 <main>
   <h1>Seth's Signals Admin</h1>
   <p class="muted">Private publishing dashboard and source health monitor.</p>
+
   <section class="card" id="login">
     <label for="token">Admin token</label>
     <input id="token" type="password" autocomplete="current-password">
     <button id="login-button">Unlock</button>
   </section>
+
   <div id="editor" hidden>
     <section class="card">
       <h2>Source Health & Last Update Monitor</h2>
       <p class="muted">Real-time status of all 32 monitored news feeds. Sources older than 48 hours are flagged in red.</p>
       <div id="sources-health-list" style="margin-top: 14px; overflow-x: auto;">Loading sources health...</div>
     </section>
+
     <form class="card" id="signal-form">
       <h2 id="form-title">New signal</h2>
       <label for="signal-text">Thought</label>
-      <textarea id="signal-text" maxlength="2000" required placeholder="A possibility or signal you want to put on the table..."></textarea>
+      <textarea id="signal-text" maxlength="2000" required
+        placeholder="A possibility or signal you want to put on the table..."></textarea>
+
       <label for="signal-links">Related links (one per line: title | https://...)</label>
       <textarea id="signal-links" placeholder="Optional; up to five HTTPS links"></textarea>
+
       <label for="signal-status">Status</label>
-      <select id="signal-status"><option value="draft">Draft (private)</option><option value="published">Publish to feed</option></select>
-      <div class="row"><button type="submit">Save signal</button><button class="secondary" type="button" id="cancel-edit">Clear form</button></div>
+      <select id="signal-status">
+        <option value="draft">Draft (private)</option>
+        <option value="published">Publish to feed</option>
+      </select>
+
+      <div class="row">
+        <button type="submit">Save signal</button>
+        <button class="secondary" type="button" id="cancel-edit">Clear form</button>
+      </div>
       <p id="status" role="status"></p>
     </form>
+
     <section class="card"><h2>Saved signals</h2><div id="signals"></div></section>
   </div>
 </main>
+
 <script>
-let adminToken = '';
+let adminToken = "";
 let editingId = null;
-const $ = id => document.getElementById(id);
-function showStatus(message){$('status').textContent=message;}
-async function api(path, options={}) {
+const byId = id => document.getElementById(id);
+
+async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
-    headers: {'Authorization': 'Bearer '+adminToken, 'Content-Type':'application/json', ...(options.headers||{})}
+    headers: {
+      "Authorization": "Bearer " + adminToken,
+      "Content-Type": "application/json"
+    }
   });
+
   if (!response.ok) {
-    let detail='HTTP '+response.status;
-    try { detail=(await response.json()).error||detail; } catch {}
-    throw new Error(detail);
+    let message = "HTTP " + response.status;
+    try { message = (await response.json()).error || message; } catch {}
+    throw new Error(message);
   }
-  return response.status===204 ? null : response.json();
+
+  return response.status === 204 ? null : response.json();
 }
-function clearForm(){
-  editingId=null;$('signal-form').reset();$('form-title').textContent='New signal';showStatus('');
+
+function clearForm() {
+  editingId = null;
+  byId("signal-form").reset();
+  byId("form-title").textContent = "New signal";
+  byId("status").textContent = "";
 }
-function escapeHtml(str){return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function renderSignals(items){
-  const root=$('signals');root.replaceChildren();
-  for(const signal of items){
-    const article=document.createElement('article');article.className='card';
-    const heading=document.createElement('strong');heading.textContent=signal.status==='published'?'Published':'Draft';
-    const body=document.createElement('p');body.textContent=signal.text;body.style.whiteSpace='pre-wrap';body.style.lineHeight='1.5';
-    const date=document.createElement('p');date.className='muted';date.textContent=new Date(signal.updatedAt).toLocaleString();
-    const actions=document.createElement('div');actions.className='row';
-    const edit=document.createElement('button');edit.className='secondary';edit.textContent='Edit';
-    edit.onclick=()=>{editingId=signal.id;$('signal-text').value=signal.text;$('signal-links').value=(signal.links||[]).map(x=>(x.title?x.title+' | ':'')+x.url).join('\\n');$('signal-status').value=signal.status;$('form-title').textContent='Edit signal';window.scrollTo({top:0,behavior:'smooth'});};
-    const toggle=document.createElement('button');toggle.className='secondary';toggle.textContent=signal.status==='published'?'Unpublish':'Publish';
-    toggle.onclick=async()=>{try{await api('/api/admin/signals/'+encodeURIComponent(signal.id),{method:'PUT',body:JSON.stringify({...signal,status:signal.status==='published'?'draft':'published'})});await loadSignals();}catch(e){alert(e.message);}};
-    const remove=document.createElement('button');remove.className='danger';remove.textContent='Delete';
-    remove.onclick=async()=>{if(!confirm('Delete this signal permanently?'))return;try{await api('/api/admin/signals/'+encodeURIComponent(signal.id),{method:'DELETE'});await loadSignals();}catch(e){alert(e.message);}};
-    actions.append(edit,toggle,remove);article.append(heading,date,body,actions);root.append(article);
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadSignals() {
+  const result = await api("/api/admin/signals");
+  const root = byId("signals");
+  root.replaceChildren();
+
+  for (const signal of result.signals || []) {
+    const card = document.createElement("article");
+    card.className = "card";
+
+    const heading = document.createElement("strong");
+    heading.textContent = signal.status === "published" ? "Published" : "Draft";
+
+    const date = document.createElement("p");
+    date.className = "muted";
+    date.textContent = new Date(signal.updatedAt).toLocaleString();
+
+    const text = document.createElement("p");
+    text.textContent = signal.text;
+    text.style.whiteSpace = "pre-wrap";
+
+    const actions = document.createElement("div");
+    actions.className = "row";
+
+    const edit = document.createElement("button");
+    edit.className = "secondary";
+    edit.textContent = "Edit";
+    edit.onclick = () => {
+      editingId = signal.id;
+      byId("signal-text").value = signal.text;
+      byId("signal-links").value = (signal.links || [])
+        .map(link => (link.title ? link.title + " | " : "") + link.url)
+        .join("\\n");
+      byId("signal-status").value = signal.status;
+      byId("form-title").textContent = "Edit signal";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const toggle = document.createElement("button");
+    toggle.className = "secondary";
+    toggle.textContent = signal.status === "published" ? "Unpublish" : "Publish";
+    toggle.onclick = async () => {
+      try {
+        await api("/api/admin/signals/" + encodeURIComponent(signal.id), {
+          method: "PUT",
+          body: JSON.stringify({
+            ...signal,
+            status: signal.status === "published" ? "draft" : "published"
+          })
+        });
+        await loadSignals();
+      } catch (error) {
+        alert(error.message);
+      }
+    };
+
+    const remove = document.createElement("button");
+    remove.className = "danger";
+    remove.textContent = "Delete";
+    remove.onclick = async () => {
+      if (!confirm("Delete this signal permanently?")) return;
+      try {
+        await api("/api/admin/signals/" + encodeURIComponent(signal.id), {
+          method: "DELETE"
+        });
+        await loadSignals();
+      } catch (error) {
+        alert(error.message);
+      }
+    };
+
+    actions.append(edit, toggle, remove);
+    card.append(heading, date, text, actions);
+    root.append(card);
   }
 }
-async function loadSignals(){const result=await api('/api/admin/signals');renderSignals(result.signals||[]);}
-async function loadSourcesHealth(){
+
+async function loadSourcesHealth() {
   try {
     const res = await api('/api/admin/sources-health');
     const container = document.getElementById('sources-health-list');
@@ -405,30 +305,56 @@ async function loadSourcesHealth(){
     if (container) container.textContent = 'Could not load sources health: ' + e.message;
   }
 }
-$('login-button').onclick=async()=>{
-  adminToken=$('token').value.trim();
-  try{
+
+byId("login-button").onclick = async () => {
+  adminToken = byId("token").value.trim();
+  try {
     await Promise.all([loadSignals(), loadSourcesHealth()]);
-    $('login').hidden=true;
-    $('editor').hidden=false;
+    byId("login").hidden = true;
+    byId("editor").hidden = false;
+  } catch (error) {
+    adminToken = "";
+    alert("Could not unlock: " + error.message);
   }
-  catch(e){adminToken='';alert('Could not unlock: '+e.message);}
 };
-$('signal-form').onsubmit=async event=>{
+
+byId("signal-form").onsubmit = async event => {
   event.preventDefault();
-  try{
-    const links=$('signal-links').value.split('\\n').map(line=>line.trim()).filter(Boolean).map(line=>{
-      const parts=line.split('|');return {title:parts.length>1?parts[0].trim():'',url:(parts.length>1?parts.slice(1).join('|'):parts[0]).trim()};
+
+  try {
+    const links = byId("signal-links").value
+      .split("\\n")
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => {
+        const parts = line.split("|");
+        return {
+          title: parts.length > 1 ? parts[0].trim() : "",
+          url: (parts.length > 1 ? parts.slice(1).join("|") : parts[0]).trim()
+        };
+      });
+
+    const body = JSON.stringify({
+      text: byId("signal-text").value,
+      links,
+      status: byId("signal-status").value
     });
-    const body=JSON.stringify({text:$('signal-text').value,links,status:$('signal-status').value});
-    await api(editingId?'/api/admin/signals/'+encodeURIComponent(editingId):'/api/admin/signals',{method:editingId?'PUT':'POST',body});
-    clearForm();showStatus('Saved.');await loadSignals();
-  }catch(e){showStatus(e.message);}
+
+    const path = editingId
+      ? "/api/admin/signals/" + encodeURIComponent(editingId)
+      : "/api/admin/signals";
+
+    await api(path, { method: editingId ? "PUT" : "POST", body });
+    clearForm();
+    byId("status").textContent = "Saved.";
+    await loadSignals();
+  } catch (error) {
+    byId("status").textContent = error.message;
+  }
 };
-$('cancel-edit').onclick=clearForm;
+
+byId("cancel-edit").onclick = clearForm;
 </script>
 </body>
 </html>`);
 });
-
-}
