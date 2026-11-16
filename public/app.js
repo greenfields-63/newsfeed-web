@@ -414,32 +414,24 @@ async function refreshNews() {
       return parseXmlFeed(feed.xml, source);
     });
 
+    let translationRequestId = ++headlineTranslationRequest;
+    let translationLanguage = headlineLanguage;
+    let translatedItems = await translateItemsForLanguage(allItems, translationLanguage);
+    while (translationLanguage !== headlineLanguage || translationRequestId !== headlineTranslationRequest) {
+      translationRequestId = ++headlineTranslationRequest;
+      translationLanguage = headlineLanguage;
+      translatedItems = await translateItemsForLanguage(allItems, translationLanguage);
+    }
+
+    cachedHeadlines = filterRecentHeadlines(translatedItems);
+    saveHeadlines();
+
     const snapshotDate = new Date(snapshot.generatedAt);
     const updatedAt = Number.isNaN(snapshotDate.getTime()) ? new Date() : snapshotDate;
     lastUpdatedText.textContent = `Snapshot updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     if (!Number.isNaN(snapshotDate.getTime())) {
       lastSnapshotGeneratedAt = snapshotDate.toISOString();
       localStorage.setItem('newsfeed_last_snapshot_generated_at', lastSnapshotGeneratedAt);
-    }
-
-    cachedHeadlines = filterRecentHeadlines(allItems.map(item => getSynchronousItem(item, headlineLanguage)));
-    saveHeadlines();
-    renderHeadlines();
-
-    const translationRequestId = ++headlineTranslationRequest;
-    const translationLanguage = headlineLanguage;
-    if (translationLanguage !== 'none') {
-      void translateItemsForLanguage(allItems, translationLanguage)
-        .then(translatedItems => {
-          if (
-            translationRequestId !== headlineTranslationRequest ||
-            translationLanguage !== headlineLanguage
-          ) return;
-          cachedHeadlines = filterRecentHeadlines(translatedItems);
-          saveHeadlines();
-          renderHeadlines();
-        })
-        .catch(error => console.warn('Could not translate headlines:', error));
     }
   } catch (err) {
     console.error('Could not load the latest news snapshot:', err);
@@ -514,7 +506,6 @@ function parseXmlFeed(xmlText, source) {
 
     if (title) {
       const pubDate = parseDate(pubDateStr);
-      const translatedTitle = cleanText(node.querySelector('translatedTitle')?.textContent || '');
       result.push({
         id: `${source.id}_${hashString(guid)}`,
         sourceId: source.id,
@@ -522,7 +513,6 @@ function parseXmlFeed(xmlText, source) {
         sourceColor: source.color,
         language: source.language,
         originalTitle: title,
-        translatedTitle: translatedTitle || null,
         displayTitle: title,
         link: link.trim(),
         pubDate: pubDate,
@@ -551,43 +541,6 @@ function normalizeFeedDates(items) {
 
 // TRANSLATION ENGINE (Google Translate Free GTX Endpoint + LocalStorage Cache)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
-
-function getSynchronousItem(item, targetLanguage) {
-  if (!item.originalTitle) return { ...item, displayTitle: '', isTranslated: false };
-  const sourceLanguage = (item.language || '').toLowerCase().split('-')[0];
-  const targetLanguageCode = (targetLanguage || '').toLowerCase().split('-')[0];
-  if (targetLanguage === 'none' || sourceLanguage === targetLanguageCode) {
-    return { ...item, displayTitle: item.originalTitle, isTranslated: false };
-  }
-
-  if ((targetLanguageCode === 'en' || targetLanguage === 'en-US') && item.translatedTitle) {
-    return {
-      ...item,
-      displayTitle: item.translatedTitle,
-      isTranslated: true
-    };
-  }
-
-  const cacheKey = `${item.language}_${targetLanguage}_${item.originalTitle}`;
-  if (translationCache[cacheKey]) {
-    return {
-      ...item,
-      displayTitle: translationCache[cacheKey],
-      isTranslated: translationCache[cacheKey].toLowerCase() !== item.originalTitle.toLowerCase()
-    };
-  }
-
-  const existing = cachedHeadlines.find(h => h.id === item.id);
-  if (existing && existing.displayTitle) {
-    return {
-      ...item,
-      displayTitle: existing.displayTitle,
-      isTranslated: Boolean(existing.isTranslated)
-    };
-  }
-
-  return { ...item, displayTitle: item.originalTitle, isTranslated: false };
-}
 
 async function translateItemIfNeeded(item, targetLanguage) {
   if (!item.originalTitle) return item;

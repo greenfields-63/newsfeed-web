@@ -191,14 +191,11 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   const results = await mapWithLimit(sourcesToFetch, sourcesToFetch.length, async source => {
     try {
       const feedUrl = FEED_URL_OVERRIDES[source.id] || source.feedUrl;
-      let xml = source.id === "cnn"
+      const xml = source.id === "cnn"
         ? await fetchCnnFeed()
         : new URL(feedUrl).hostname === "news.google.com"
           ? await fetchRenderProxyFeed(feedUrl)
           : await fetchRssFeed(feedUrl);
-      if (source.language && source.language !== "en") {
-        xml = await embedTranslationsInXml(xml, source.language);
-      }
       return { id: source.id, xml };
     } catch (error) {
       console.error(`Snapshot fetch failed for ${source.id}:`, error.message);
@@ -232,57 +229,6 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   console.log(
     `Snapshot saved to R2: ${results.filter(result => result.xml).length}/${sourcesToFetch.length} feeds successful`
   );
-}
-
-async function embedTranslationsInXml(xmlText, sourceLanguage) {
-  if (!xmlText || !sourceLanguage || sourceLanguage === "en") return xmlText;
-  try {
-    const itemMatches = [...xmlText.matchAll(/<item[\s\S]*?<\/item>/gi)];
-    if (!itemMatches.length) return xmlText;
-
-    const langCode = sourceLanguage.toLowerCase().split("-")[0];
-    let updatedXml = xmlText;
-
-    const slice = itemMatches.slice(0, 25);
-    await Promise.all(slice.map(async match => {
-      const itemXml = match[0];
-      if (itemXml.includes("<translatedTitle>")) return;
-
-      const titleMatch = itemXml.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
-      if (!titleMatch || !titleMatch[1]) return;
-
-      const originalTitle = titleMatch[1].trim();
-      if (!originalTitle) return;
-
-      try {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(langCode)}&tl=en&dt=t&q=${encodeURIComponent(originalTitle)}`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data[0] && Array.isArray(data[0])) {
-            const translated = data[0].map(x => x[0]).join("").trim();
-            if (translated && translated.toLowerCase() !== originalTitle.toLowerCase()) {
-              const escapedTranslated = translated
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;");
-              const newItemXml = itemXml.replace(
-                /<\/item>/i,
-                `<translatedTitle>${escapedTranslated}</translatedTitle></item>`
-              );
-              updatedXml = updatedXml.replace(itemXml, newItemXml);
-            }
-          }
-        }
-      } catch (e) {
-        // Skip single item translation error
-      }
-    }));
-
-    return updatedXml;
-  } catch (e) {
-    return xmlText;
-  }
 }
 
 async function fetchRenderProxyFeed(feedUrl) {
