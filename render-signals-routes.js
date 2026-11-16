@@ -243,12 +243,14 @@ async function api(path, options={}) {
 function clearForm(){
   editingId=null;$('signal-form').reset();$('form-title').textContent='New signal';showStatus('');
 }
+function escapeHtml(str){return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function renderSignals(items){
   const root=$('signals');root.replaceChildren();
   for(const signal of items){
     const article=document.createElement('article');article.className='card';
     const heading=document.createElement('strong');heading.textContent=signal.status==='published'?'Published':'Draft';
-    const body=document.createElement('p');body.textContent=signal.text;
+    const body=document.createElement('div');body.className='signal-body';body.style.whiteSpace='pre-wrap';body.style.lineHeight='1.6';body.style.margin='10px 0';
+    body.innerHTML=escapeHtml(signal.text).replace(/\*\*(.*?)\*\*/g, '<strong style="color:#f87171;font-weight:700;">$1</strong>');
     const date=document.createElement('p');date.className='muted';date.textContent=new Date(signal.updatedAt).toLocaleString();
     const actions=document.createElement('div');actions.className='row';
     const edit=document.createElement('button');edit.className='secondary';edit.textContent='Edit';
