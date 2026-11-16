@@ -61,6 +61,79 @@ async function writeSignals(signals) {
   }));
 }
 
+const SOURCE_METADATA_ADMIN = [
+  { id: "infobae", name: "Infobae", country: "Argentina" },
+  { id: "caixin", name: "Caixin Global", country: "China" },
+  { id: "the_paper", name: "The Paper (澎湃新闻)", country: "China" },
+  { id: "rtve", name: "RTVE", country: "Spain" },
+  { id: "scmp", name: "South China Morning Post", country: "China" },
+  { id: "xinhua", name: "Xinhua News", country: "China" },
+  { id: "abc_australia", name: "ABC News Australia", country: "Australia" },
+  { id: "sbs", name: "SBS News", country: "Australia" },
+  { id: "mercopress", name: "MercoPress", country: "Global" },
+  { id: "reuters", name: "Reuters", country: "Global" },
+  { id: "france24", name: "France 24", country: "France" },
+  { id: "israel_hayom", name: "Israel Hayom", country: "Israel" },
+  { id: "inn", name: "Israel National News", country: "Israel" },
+  { id: "jpost", name: "Jerusalem Post", country: "Israel" },
+  { id: "times_of_israel", name: "Times of Israel", country: "Israel" },
+  { id: "ynet", name: "Ynet", country: "Israel" },
+  { id: "nhk", name: "NHK News", country: "Japan" },
+  { id: "ria", name: "RIA Novosti", country: "Russia" },
+  { id: "tass", name: "TASS", country: "Russia" },
+  { id: "al_arabiya", name: "Al Arabiya", country: "Saudi Arabia" },
+  { id: "al_akhbar", name: "Al-Akhbar", country: "Lebanon" },
+  { id: "an_nahar", name: "An-Nahar", country: "Lebanon" },
+  { id: "bbc", name: "BBC News", country: "United Kingdom" },
+  { id: "sky", name: "Sky News", country: "United Kingdom" },
+  { id: "abc", name: "ABC News", country: "United States" },
+  { id: "ap", name: "Associated Press", country: "United States" },
+  { id: "bloomberg", name: "Bloomberg", country: "United States" },
+  { id: "cbs", name: "CBS News", country: "United States" },
+  { id: "cnn", name: "CNN", country: "United States" },
+  { id: "fox", name: "Fox News", country: "United States" },
+  { id: "amar_ujala", name: "Amar Ujala", country: "India" },
+  { id: "nbc", name: "NBC News", country: "United States" }
+].sort((a, b) => a.name.localeCompare(b.name));
+
+app.get("/api/admin/sources-health", signalsAdminAuthorized, async (req, res) => {
+  try {
+    if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
+    let snapshot = { feeds: {} };
+    try {
+      const obj = await s3.send(new GetObjectCommand({
+        Bucket: SIGNALS_BUCKET,
+        Key: "newsfeed/cloudflare-news-snapshot-published.json"
+      }));
+      snapshot = JSON.parse(await obj.Body.transformToString());
+    } catch (e) {}
+
+    const now = Date.now();
+    const fortyEightHoursAgo = now - (48 * 60 * 60 * 1000);
+    const health = SOURCE_METADATA_ADMIN.map(source => {
+      const feed = snapshot.feeds?.[source.id];
+      const xml = feed?.xml || "";
+      const pubDateMatches = [...xml.matchAll(/<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/pubDate>/gi)];
+      const dates = pubDateMatches.map(m => Date.parse(m[1].trim())).filter(t => !isNaN(t));
+      const latestDate = dates.length ? Math.max(...dates) : null;
+      const isStale = !latestDate || latestDate < fortyEightHoursAgo;
+
+      return {
+        id: source.id,
+        name: source.name,
+        country: source.country,
+        latestArticleDate: latestDate ? new Date(latestDate).toISOString() : null,
+        isStale
+      };
+    });
+
+    return res.json({ sources: health });
+  } catch (error) {
+    console.error("Could not fetch sources health:", error.message);
+    return res.status(500).json({ error: "Could not fetch sources health" });
+  }
+});
+
 function validateSignalInput(body) {
   if (!body || typeof body.text !== "string" || !body.text.trim()) {
     return { error: "Signal text is required" };
@@ -102,7 +175,7 @@ app.get("/api/signals", async (req, res) => {
   try {
     const signals = await readSignals();
     const published = signals
-      .filter(signal => signal.status === "published")
+      .filter(signal => signal.status === "published" && !signal.id?.startsWith("audit-"))
       .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
     return res
       .set("Cache-Control", "public, max-age=30")
@@ -115,7 +188,9 @@ app.get("/api/signals", async (req, res) => {
 
 app.get("/api/admin/signals", signalsAdminAuthorized, async (req, res) => {
   try {
-    return res.json({ signals: await readSignals() });
+    const signals = await readSignals();
+    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
+    return res.json({ signals: cleanSignals });
   } catch (error) {
     console.error("Could not read admin signals:", error.message);
     return res.status(500).json({ error: "Signals are temporarily unavailable" });
@@ -135,8 +210,9 @@ app.post("/api/admin/signals", signalsAdminAuthorized, async (req, res) => {
       updatedAt: now,
     };
     const signals = await readSignals();
-    signals.push(signal);
-    await writeSignals(signals);
+    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
+    cleanSignals.push(signal);
+    await writeSignals(cleanSignals);
     return res.status(201).json({ signal });
   } catch (error) {
     console.error("Could not create signal:", error.message);
@@ -150,16 +226,17 @@ app.put("/api/admin/signals/:id", signalsAdminAuthorized, async (req, res) => {
 
   try {
     const signals = await readSignals();
-    const index = signals.findIndex(signal => signal.id === req.params.id);
+    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
+    const index = cleanSignals.findIndex(signal => signal.id === req.params.id);
     if (index === -1) return res.status(404).json({ error: "Signal not found" });
 
-    signals[index] = {
-      ...signals[index],
+    cleanSignals[index] = {
+      ...cleanSignals[index],
       ...validated.value,
       updatedAt: new Date().toISOString(),
     };
-    await writeSignals(signals);
-    return res.json({ signal: signals[index] });
+    await writeSignals(cleanSignals);
+    return res.json({ signal: cleanSignals[index] });
   } catch (error) {
     console.error("Could not update signal:", error.message);
     return res.status(500).json({ error: "Could not save signal" });
@@ -169,8 +246,9 @@ app.put("/api/admin/signals/:id", signalsAdminAuthorized, async (req, res) => {
 app.delete("/api/admin/signals/:id", signalsAdminAuthorized, async (req, res) => {
   try {
     const signals = await readSignals();
-    const updated = signals.filter(signal => signal.id !== req.params.id);
-    if (updated.length === signals.length) {
+    const cleanSignals = signals.filter(signal => !signal.id?.startsWith("audit-"));
+    const updated = cleanSignals.filter(signal => signal.id !== req.params.id);
+    if (updated.length === cleanSignals.length) {
       return res.status(404).json({ error: "Signal not found" });
     }
     await writeSignals(updated);
@@ -190,7 +268,7 @@ app.get("/signals-admin", (req, res) => {
   <title>Seth's Signals Admin</title>
   <style>
     body{margin:0;padding:24px;background:#0f172a;color:#e2e8f0;font:16px system-ui,sans-serif}
-    main{max-width:760px;margin:auto}.card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;margin:16px 0}
+    main{max-width:820px;margin:auto}.card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;margin:16px 0}
     input,textarea,select,button{box-sizing:border-box;font:inherit;border-radius:8px;padding:10px}
     input,textarea,select{width:100%;margin:6px 0 14px;background:#0f172a;color:#f8fafc;border:1px solid #475569}
     textarea{min-height:120px}button{border:0;background:#0284c7;color:white;font-weight:700;cursor:pointer;margin:4px}
@@ -201,14 +279,19 @@ app.get("/signals-admin", (req, res) => {
 </head>
 <body>
 <main>
-  <h1>Seth's Signals</h1>
-  <p class="muted">Private publishing dashboard. Published notes appear separately from reported news.</p>
+  <h1>Seth's Signals Admin</h1>
+  <p class="muted">Private publishing dashboard and source health monitor.</p>
   <section class="card" id="login">
     <label for="token">Admin token</label>
     <input id="token" type="password" autocomplete="current-password">
     <button id="login-button">Unlock</button>
   </section>
   <div id="editor" hidden>
+    <section class="card">
+      <h2>Source Health & Last Update Monitor</h2>
+      <p class="muted">Real-time status of all 32 monitored news feeds. Sources older than 48 hours are flagged in red.</p>
+      <div id="sources-health-list" style="margin-top: 14px; overflow-x: auto;">Loading sources health...</div>
+    </section>
     <form class="card" id="signal-form">
       <h2 id="form-title">New signal</h2>
       <label for="signal-text">Thought</label>
@@ -249,8 +332,7 @@ function renderSignals(items){
   for(const signal of items){
     const article=document.createElement('article');article.className='card';
     const heading=document.createElement('strong');heading.textContent=signal.status==='published'?'Published':'Draft';
-    const body=document.createElement('div');body.className='signal-body';body.style.whiteSpace='pre-wrap';body.style.lineHeight='1.6';body.style.margin='10px 0';
-    body.innerHTML=escapeHtml(signal.text).replace(/\*\*(.*?)\*\*/g, '<strong style="color:#f87171;font-weight:700;">$1</strong>');
+    const body=document.createElement('p');body.textContent=signal.text;body.style.whiteSpace='pre-wrap';body.style.lineHeight='1.5';
     const date=document.createElement('p');date.className='muted';date.textContent=new Date(signal.updatedAt).toLocaleString();
     const actions=document.createElement('div');actions.className='row';
     const edit=document.createElement('button');edit.className='secondary';edit.textContent='Edit';
@@ -263,9 +345,49 @@ function renderSignals(items){
   }
 }
 async function loadSignals(){const result=await api('/api/admin/signals');renderSignals(result.signals||[]);}
+async function loadSourcesHealth(){
+  try {
+    const res = await api('/api/admin/sources-health');
+    const container = document.getElementById('sources-health-list');
+    if (!container) return;
+    container.replaceChildren();
+
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '14px';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = `<tr style="border-bottom: 1px solid #334155; text-align: left; color: #94a3b8;"><th style="padding: 8px;">Source</th><th style="padding: 8px;">Country</th><th style="padding: 8px;">Last Update</th><th style="padding: 8px;">Status</th></tr>`;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (const src of (res.sources || [])) {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid #1e293b';
+
+      const dateStr = src.latestArticleDate ? new Date(src.latestArticleDate).toLocaleString() : 'No articles';
+      const statusBadge = src.isStale
+        ? \`<span style="background:#b91c1c; color:white; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px;">Stale >48h</span>\`
+        : \`<span style="background:#15803d; color:white; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px;">Active</span>\`;
+
+      tr.innerHTML = \`<td style="padding: 8px; font-weight:600; color:#f8fafc;">\${escapeHtml(src.name)}</td><td style="padding: 8px; color:#94a3b8;">\${escapeHtml(src.country)}</td><td style="padding: 8px; color:#cbd5e1;">\${dateStr}</td><td style="padding: 8px;">\${statusBadge}</td>\`;
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  } catch (e) {
+    const container = document.getElementById('sources-health-list');
+    if (container) container.textContent = 'Could not load sources health: ' + e.message;
+  }
+}
 $('login-button').onclick=async()=>{
   adminToken=$('token').value.trim();
-  try{await loadSignals();$('login').hidden=true;$('editor').hidden=false;}
+  try{
+    await Promise.all([loadSignals(), loadSourcesHealth()]);
+    $('login').hidden=true;
+    $('editor').hidden=false;
+  }
   catch(e){adminToken='';alert('Could not unlock: '+e.message);}
 };
 $('signal-form').onsubmit=async event=>{
