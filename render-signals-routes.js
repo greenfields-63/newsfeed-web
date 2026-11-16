@@ -49,8 +49,8 @@ app.get("/api/admin/sources-health", authorizeSignalsAdmin, async (req, res) => 
     const now = Date.now();
     const fortyEightHoursAgo = now - (48 * 60 * 60 * 1000);
     const health = SOURCE_METADATA_ADMIN.map(source => {
-      const feed = snapshot.feeds?.[source.id];
-      const xml = feed?.xml || "";
+      const feed = snapshot.feeds && snapshot.feeds[source.id] ? snapshot.feeds[source.id] : null;
+      const xml = feed && feed.xml ? feed.xml : "";
       const pubDateMatches = [...xml.matchAll(/<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/pubDate>/gi)];
       const dates = pubDateMatches.map(m => Date.parse(m[1].trim())).filter(t => !isNaN(t));
       const latestDate = dates.length ? Math.max(...dates) : null;
@@ -309,9 +309,10 @@ async function loadSourcesHealth() {
 byId("login-button").onclick = async () => {
   adminToken = byId("token").value.trim();
   try {
-    await Promise.all([loadSignals(), loadSourcesHealth()]);
+    await loadSignals();
     byId("login").hidden = true;
     byId("editor").hidden = false;
+    loadSourcesHealth();
   } catch (error) {
     adminToken = "";
     alert("Could not unlock: " + error.message);
