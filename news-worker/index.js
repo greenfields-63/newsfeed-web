@@ -73,6 +73,7 @@ const GOOGLE_NEWS_HOST = "news.google.com";
 const FEED_URL_OVERRIDES = {
   abc: "https://abcnews.com/abcnews/topstories",
   bloomberg: "https://www.bloomberg.com/feeds/politics/news.rss",
+  nhk: "https://news.google.com/rss/search?q=when%3A24h%20site%3Awww3.nhk.or.jp%2Fnews&hl=ja&gl=JP&ceid=JP%3Aja",
   tass: TASS_FEED_URL
 };
 const ALLOWED_HOSTS = new Set([

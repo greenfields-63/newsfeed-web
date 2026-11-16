@@ -20,7 +20,7 @@ const DEFAULT_SOURCES = [
   { id: "jpost", name: "Jerusalem Post", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20source%3AJerusalem%20Post&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#0288D1", country: "Israel" },
   { id: "times_of_israel", name: "Times of Israel", feedUrl: "https://www.timesofisrael.com/feed/", language: "en", color: "#00796B", country: "Israel" },
   { id: "ynet", name: "Ynet", feedUrl: "https://www.ynet.co.il/Integration/StoryRss1854.xml", language: "he", color: "#D32F2F", country: "Israel" },
-  { id: "nhk", name: "NHK News", feedUrl: "https://www3.nhk.or.jp/rss/news/cat0.xml", language: "ja", color: "#0277BD", country: "Japan" },
+  { id: "nhk", name: "NHK News", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Awww3.nhk.or.jp%2Fnews&hl=ja&gl=JP&ceid=JP%3Aja", language: "ja", color: "#0277BD", country: "Japan" },
   { id: "ria", name: "RIA Novosti", feedUrl: "https://ria.ru/export/rss2/index.xml", language: "ru", color: "#1565C0", country: "Russia" },
   { id: "tass", name: "TASS", feedUrl: "https://tass.com/rss/v2.xml", language: "en", color: "#0D47A1", country: "Russia" },
   { id: "al_arabiya", name: "Al Arabiya", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20%22Al%20Arabiya%22&hl=ar&gl=SA&ceid=SA%3Aar", language: "ar", color: "#2E7D32", country: "Saudi Arabia" },
