@@ -34,6 +34,27 @@ const SOURCE_METADATA_ADMIN = [
   { id: "nbc", name: "NBC News", country: "United States" }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
+function signalsAdminAuthorized(req, res, next) {
+  if (!SIGNALS_TOKEN || SIGNALS_TOKEN.length < 32) {
+    return res.status(503).json({ error: "Signals admin is not configured" });
+  }
+
+  const provided = req.get("authorization") || "";
+  const match = provided.match(/^Bearer ([^\s]+)$/);
+  if (!match) return res.status(401).json({ error: "Unauthorized" });
+
+  const expectedBuffer = Buffer.from(SIGNALS_TOKEN);
+  const providedBuffer = Buffer.from(match[1]);
+  if (
+    expectedBuffer.length !== providedBuffer.length ||
+    !timingSafeEqual(expectedBuffer, providedBuffer)
+  ) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  next();
+}
+
 app.get("/api/admin/sources-health", signalsAdminAuthorized, async (req, res) => {
   try {
     if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
