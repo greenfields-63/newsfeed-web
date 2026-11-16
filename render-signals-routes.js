@@ -34,7 +34,7 @@ const SOURCE_METADATA_ADMIN = [
   { id: "nbc", name: "NBC News", country: "United States" }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
-app.get("/api/admin/sources-health", authorizeSignalsAdmin, async (req, res) => {
+app.get("/api/admin/sources-health", signalsAdminAuthorized, async (req, res) => {
   try {
     if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
     let snapshot = { feeds: {} };
