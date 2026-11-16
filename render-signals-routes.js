@@ -1,13 +1,13 @@
 // Seth's Signals routes. Paste into the Render backend's index.js above app.listen().
 // Requires the existing `app`, `s3`, and `PutObjectCommand` definitions.
-const { GetObjectCommand } = require("@aws-sdk/client-s3");
+const { GetObjectCommand: GetObjCmd } = require("@aws-sdk/client-s3");
 const { randomUUID, timingSafeEqual } = require("node:crypto");
 
 const SIGNALS_BUCKET = process.env.R2_BUCKET_NAME;
 const SIGNALS_OBJECT_KEY = "newsfeed/signals.json";
 const SIGNALS_TOKEN = process.env.SIGNALS_ADMIN_TOKEN;
 
-app.use(express.json({ limit: "16kb" }));
+if (typeof app !== 'undefined' && app._router && !app._router.stack.some(r => r.route && r.route.path === '/api/admin/sources-health')) {
 
 function signalsAdminAuthorized(req, res, next) {
   if (!SIGNALS_TOKEN || SIGNALS_TOKEN.length < 32) {
@@ -34,7 +34,7 @@ async function readSignals() {
   if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
 
   try {
-    const object = await s3.send(new GetObjectCommand({
+    const object = await s3.send(new GetObjCmd({
       Bucket: SIGNALS_BUCKET,
       Key: SIGNALS_OBJECT_KEY,
     }));
@@ -101,7 +101,7 @@ app.get("/api/admin/sources-health", signalsAdminAuthorized, async (req, res) =>
     if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
     let snapshot = { feeds: {} };
     try {
-      const obj = await s3.send(new GetObjectCommand({
+      const obj = await s3.send(new GetObjCmd({
         Bucket: SIGNALS_BUCKET,
         Key: "newsfeed/cloudflare-news-snapshot-published.json"
       }));
@@ -430,3 +430,5 @@ $('cancel-edit').onclick=clearForm;
 </body>
 </html>`);
 });
+
+}
