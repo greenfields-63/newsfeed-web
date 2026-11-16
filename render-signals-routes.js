@@ -358,7 +358,7 @@ async function loadSourcesHealth(){
     table.style.fontSize = '14px';
 
     const thead = document.createElement('thead');
-    thead.innerHTML = `<tr style="border-bottom: 1px solid #334155; text-align: left; color: #94a3b8;"><th style="padding: 8px;">Source</th><th style="padding: 8px;">Country</th><th style="padding: 8px;">Last Update</th><th style="padding: 8px;">Status</th></tr>`;
+    thead.innerHTML = \`<tr style="border-bottom: 1px solid #334155; text-align: left; color: #94a3b8;"><th style="padding: 8px;">Source</th><th style="padding: 8px;">Country</th><th style="padding: 8px;">Last Update</th><th style="padding: 8px;">Status</th></tr>\`;
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
