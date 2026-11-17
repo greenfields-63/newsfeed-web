@@ -560,30 +560,25 @@ async function translateItemIfNeeded(item, targetLanguage) {
   }
 
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(item.originalTitle)}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn(`Headline translation request failed with HTTP ${res.status}.`);
-      return { ...item, displayTitle: item.originalTitle, isTranslated: false };
-    }
-    const data = await res.json();
-    if (data && data[0] && Array.isArray(data[0])) {
-      const translated = cleanText(data[0].map(x => x[0]).join(''));
-      if (translated && translated.toLowerCase() !== item.originalTitle.toLowerCase()) {
-        translationCache[cacheKey] = translated;
-        localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
-        return {
-          ...item,
-          displayTitle: translated,
-          isTranslated: true
-        };
-      }
-      if (translated) {
-        return { ...item, displayTitle: translated, isTranslated: false };
+    const proxyUrl = `https://worldcup-odds-backend.onrender.com/api/translate?q=${encodeURIComponent(item.originalTitle)}&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}`;
+    const res = await fetch(proxyUrl);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.translatedText) {
+        const translated = cleanText(data.translatedText);
+        if (translated) {
+          translationCache[cacheKey] = translated;
+          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
+          return {
+            ...item,
+            displayTitle: translated,
+            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
+          };
+        }
       }
     }
   } catch (e) {
-    console.warn(`Could not translate headline to ${headlineLanguageOptions[targetLanguage] || targetLanguage}:`, e.message);
+    console.warn("Translation proxy request failed:", e.message);
   }
 
   return { ...item, displayTitle: item.originalTitle, isTranslated: false };

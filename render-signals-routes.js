@@ -142,6 +142,57 @@ const SOURCE_METADATA_ADMIN = [
   { id: "nbc", name: "NBC News", country: "United States" }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
+const translationProxyCache = new Map();
+
+app.get("/api/translate", async (req, res) => {
+  const { q, sl = "auto", tl = "en" } = req.query;
+  if (!q || typeof q !== "string") {
+    return res.status(400).json({ error: "Missing text parameter 'q'" });
+  }
+
+  const cacheKey = `${sl}_${tl}_${q}`;
+  if (translationProxyCache.has(cacheKey)) {
+    return res.json({ translatedText: translationProxyCache.get(cacheKey) });
+  }
+
+  if (translationProxyCache.size >= 1000) {
+    const oldestKey = translationProxyCache.keys().next().value;
+    translationProxyCache.delete(oldestKey);
+  }
+
+  // 1. Try Google GTX from server
+  try {
+    const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}&dt=t&q=${encodeURIComponent(q)}`;
+    const response = await axios.get(googleUrl, { timeout: 3000 });
+    if (response.data && response.data[0] && Array.isArray(response.data[0])) {
+      const translated = response.data[0].map(x => x[0]).join('').trim();
+      if (translated) {
+        translationProxyCache.set(cacheKey, translated);
+        return res.json({ translatedText: translated });
+      }
+    }
+  } catch (e) {
+    // Fall back to MyMemory
+  }
+
+  // 2. Fallback to MyMemory API from server
+  try {
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(q)}&langpair=${encodeURIComponent(sl + '|' + tl)}`;
+    const response = await axios.get(myMemoryUrl, { timeout: 4000 });
+    if (response.data && response.data.responseData && response.data.responseData.translatedText) {
+      const translated = response.data.responseData.translatedText.trim();
+      if (translated && !translated.startsWith('QUERY LENGTH LIMIT')) {
+        translationProxyCache.set(cacheKey, translated);
+        return res.json({ translatedText: translated });
+      }
+    }
+  } catch (e) {
+    console.warn("Server translation proxy MyMemory fallback failed:", e.message);
+  }
+
+  return res.status(502).json({ error: "Translation unavailable", translatedText: q });
+});
+
 app.get("/api/admin/sources-health", authorizeSignalsAdmin, async (req, res) => {
   try {
     if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
