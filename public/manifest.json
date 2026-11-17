@@ -1,6 +1,7 @@
 {
   "short_name": "Newsfeed",
   "name": "Realtime Breaking Newsfeed",
+  "lang": "en",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/2965/2965879.png",
@@ -11,6 +12,6 @@
   "start_url": "/",
   "background_color": "#0f172a",
   "theme_color": "#1e293b",
-  "display": "standalone",
+  "display": "minimal-ui",
   "orientation": "portrait"
 }
