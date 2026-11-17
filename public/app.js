@@ -539,9 +539,8 @@ function normalizeFeedDates(items) {
   return items;
 }
 
-// TRANSLATION ENGINE (Google Translate Free GTX Endpoint + LocalStorage Cache)
+// TRANSLATION ENGINE (Google Translate Free GTX Endpoint + MyMemory Backup + LocalStorage Cache)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
-let googleIsRateLimited = false;
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
   const controller = new AbortController();
@@ -573,17 +572,10 @@ async function translateItemIfNeeded(item, targetLanguage) {
     };
   }
 
-  if (googleIsRateLimited) {
-    return { ...item, displayTitle: item.originalTitle, isTranslated: false };
-  }
-
+  // 1. Try Google Translate GTX first (fast 400ms timeout)
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(item.originalTitle)}`;
     const res = await fetchWithTimeout(url, {}, 400);
-    if (res.status === 429) {
-      googleIsRateLimited = true;
-      return { ...item, displayTitle: item.originalTitle, isTranslated: false };
-    }
     if (res.ok) {
       const data = await res.json();
       if (data && data[0] && Array.isArray(data[0])) {
@@ -600,32 +592,48 @@ async function translateItemIfNeeded(item, targetLanguage) {
       }
     }
   } catch (e) {
-    // Timeout (400ms) or network error - trip rate limit flag to keep loading instant
-    googleIsRateLimited = true;
+    // Google failed / rate limited / timed out; proceed to MyMemory fallback
+  }
+
+  // 2. Fallback to MyMemory API (fast 1500ms timeout)
+  try {
+    const langPair = `${item.language}|${targetLanguage}`;
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.originalTitle)}&langpair=${encodeURIComponent(langPair)}`;
+    const res = await fetchWithTimeout(myMemoryUrl, {}, 1500);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.responseData && data.responseData.translatedText) {
+        const translated = cleanText(data.responseData.translatedText);
+        if (translated && !translated.startsWith('QUERY LENGTH LIMIT') && !translated.startsWith('INVALID')) {
+          translationCache[cacheKey] = translated;
+          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
+          return {
+            ...item,
+            displayTitle: translated,
+            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
+          };
+        }
+      }
+    }
+  } catch (e) {
+    // MyMemory fallback failed or timed out
   }
 
   return { ...item, displayTitle: item.originalTitle, isTranslated: false };
 }
 
 async function translateItemsForLanguage(items, targetLanguage) {
-  if (targetLanguage === 'none' || googleIsRateLimited) {
+  if (targetLanguage === 'none') {
     return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
   }
 
   const batchSize = 5;
   const results = [];
   for (let i = 0; i < items.length; i += batchSize) {
-    if (googleIsRateLimited) {
-      // If rate limited mid-batch, instantly return original titles for remaining items
-      for (let j = i; j < items.length; j++) {
-        results.push({ status: 'fulfilled', value: { ...items[j], displayTitle: items[j].originalTitle, isTranslated: false } });
-      }
-      break;
-    }
     const batch = items.slice(i, i + batchSize);
     const batchResults = await Promise.allSettled(batch.map(item => translateItemIfNeeded(item, targetLanguage)));
     results.push(...batchResults);
-    if (i + batchSize < items.length && !googleIsRateLimited) {
+    if (i + batchSize < items.length) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
