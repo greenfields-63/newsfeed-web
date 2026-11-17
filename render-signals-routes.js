@@ -1,5 +1,5 @@
 // Seth's Signals routes & Source Health Monitor. Paste above app.listen().
-const { GetObjectCommand: GetObjCmd } = require("@aws-sdk/client-s3");
+const { GetObjectCommand: GetObjCmd, PutObjectCommand: PutObjCmd } = require("@aws-sdk/client-s3");
 const { randomUUID: randUuid, timingSafeEqual: timeSafeEq } = require("node:crypto");
 
 const SIGNALS_BUCKET = process.env.R2_BUCKET_NAME;
@@ -47,7 +47,7 @@ async function readSignals() {
 async function saveSignals(signals) {
   if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
 
-  await s3.send(new PutObjectCommand({
+  await s3.send(new PutObjCmd({
     Bucket: SIGNALS_BUCKET,
     Key: SIGNALS_KEY,
     Body: JSON.stringify(signals),
