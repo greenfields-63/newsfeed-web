@@ -324,10 +324,11 @@ showSignalsToggle.addEventListener('change', () => {
   localStorage.setItem('newsfeed_show_signals', String(showSignals));
   updateSignalsVisibility();
 });
-headlineLanguageSelect.addEventListener('change', () => {
+headlineLanguageSelect?.addEventListener('change', () => {
+  if (!headlineLanguageSelect) return;
   headlineLanguage = Object.hasOwn(headlineLanguageOptions, headlineLanguageSelect.value)
     ? headlineLanguageSelect.value
-    : 'en';
+    : 'none';
   localStorage.setItem('newsfeed_headline_language', headlineLanguage);
   const requestId = ++headlineTranslationRequest;
   const targetLanguage = headlineLanguage;
@@ -825,7 +826,7 @@ function renderFilterBar() {
 // SETTINGS MODAL
 function openSettingsModal() {
   showSignalsToggle.checked = showSignals;
-  headlineLanguageSelect.value = headlineLanguage;
+  if (headlineLanguageSelect) headlineLanguageSelect.value = headlineLanguage;
   openArticleTranslatedToggle.checked = openArticlesTranslated;
   renderSourcesList();
   settingsModal.classList.remove('hidden');
