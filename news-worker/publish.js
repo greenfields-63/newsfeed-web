@@ -82,7 +82,7 @@ async function publishSnapshot(env, scheduledTime) {
     if (!snapshot) continue;
     const snapshotTime = Date.parse(snapshot.generatedAt);
     const isCurrentCycle = Number.isFinite(snapshotTime) &&
-      Math.abs(snapshotTime - scheduledTime) <= 300_000;
+      Math.abs(snapshotTime - scheduledTime) <= 600_000;
     const isInitialPublish = !publishedObject && !legacyObject;
     if (!isCurrentCycle && !isInitialPublish) continue;
 

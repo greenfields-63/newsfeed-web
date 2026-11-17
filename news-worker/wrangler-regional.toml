@@ -4,7 +4,7 @@ compatibility_date = "2026-11-09"
 workers_dev = true
 
 [triggers]
-crons = ["4-59/10 * * * *"]
+crons = ["9-59/10 * * * *"]
 
 [vars]
 SNAPSHOT_GROUP = "regional"
