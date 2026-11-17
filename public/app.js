@@ -541,8 +541,9 @@ function normalizeFeedDates(items) {
 
 // TRANSLATION ENGINE (Google Translate Free GTX Endpoint + LocalStorage Cache)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
+let googleIsRateLimited = false;
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -572,10 +573,18 @@ async function translateItemIfNeeded(item, targetLanguage) {
     };
   }
 
-  // 1. Try Google Translate GTX first (with 3s timeout)
+  if (googleIsRateLimited) {
+    return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+  }
+
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(item.originalTitle)}`;
-    const res = await fetchWithTimeout(url, {}, 3000);
+    const res = await fetchWithTimeout(url, {}, 2500);
+    if (res.status === 429) {
+      googleIsRateLimited = true;
+      console.warn("Google Translate rate-limited (429). Bypassing further network translations for instant loading.");
+      return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+    }
     if (res.ok) {
       const data = await res.json();
       if (data && data[0] && Array.isArray(data[0])) {
@@ -592,31 +601,7 @@ async function translateItemIfNeeded(item, targetLanguage) {
       }
     }
   } catch (e) {
-    // Google failed / rate limited / timed out; proceed to MyMemory fallback
-  }
-
-  // 2. Fallback to MyMemory API (with 3s timeout)
-  try {
-    const langPair = `${item.language}|${targetLanguage}`;
-    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.originalTitle)}&langpair=${encodeURIComponent(langPair)}`;
-    const res = await fetchWithTimeout(myMemoryUrl, {}, 3000);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.responseData && data.responseData.translatedText) {
-        const translated = cleanText(data.responseData.translatedText);
-        if (translated && !translated.startsWith('QUERY LENGTH LIMIT') && !translated.startsWith('INVALID')) {
-          translationCache[cacheKey] = translated;
-          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
-          return {
-            ...item,
-            displayTitle: translated,
-            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
-          };
-        }
-      }
-    }
-  } catch (e) {
-    // MyMemory fallback failed or timed out
+    // Timeout or network error
   }
 
   return { ...item, displayTitle: item.originalTitle, isTranslated: false };
