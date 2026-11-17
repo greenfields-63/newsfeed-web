@@ -4,7 +4,7 @@ compatibility_date = "2026-11-09"
 workers_dev = true
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/10 * * * *"]
 
 [[r2_buckets]]
 binding = "NEWS_SNAPSHOT_BUCKET"

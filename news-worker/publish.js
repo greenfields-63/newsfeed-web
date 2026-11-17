@@ -58,7 +58,7 @@ async function publishSnapshot(env, scheduledTime) {
   if (!bucket) throw new Error("News snapshot storage is not configured");
 
   const expectedCycle = new Date(
-    Math.floor(scheduledTime / 300_000) * 300_000
+    Math.floor(scheduledTime / 600_000) * 600_000
   ).toISOString();
   const [objects, publishedObject] = await Promise.all([
     Promise.all(PARTITION_KEYS.map(key => bucket.get(key))),
@@ -82,7 +82,7 @@ async function publishSnapshot(env, scheduledTime) {
     if (!snapshot) continue;
     const snapshotTime = Date.parse(snapshot.generatedAt);
     const isCurrentCycle = Number.isFinite(snapshotTime) &&
-      Math.abs(snapshotTime - scheduledTime) <= 150_000;
+      Math.abs(snapshotTime - scheduledTime) <= 300_000;
     const isInitialPublish = !publishedObject && !legacyObject;
     if (!isCurrentCycle && !isInitialPublish) continue;
 
