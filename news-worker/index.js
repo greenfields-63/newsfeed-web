@@ -75,6 +75,7 @@ const FEED_URL_OVERRIDES = {
   bloomberg: "https://www.bloomberg.com/feeds/politics/news.rss",
   caixin: "https://news.google.com/rss/search?q=when%3A24h%20site%3Acaixinglobal.com&hl=en-US&gl=US&ceid=US%3Aen",
   nhk: "https://news.google.com/rss/search?q=when%3A24h%20site%3Anhk.or.jp&hl=ja&gl=JP&ceid=JP%3Aja",
+  sbs: "https://news.google.com/rss/search?q=when%3A24h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen",
   tass: TASS_FEED_URL
 };
 const ALLOWED_HOSTS = new Set([
