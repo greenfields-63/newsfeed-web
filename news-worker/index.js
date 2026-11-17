@@ -37,7 +37,7 @@ const ABC_AUSTRALIA_SOURCE = {
 const SBS_SOURCE = {
   id: "sbs",
   name: "SBS News",
-  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen",
   language: "en",
   color: "#5D4037",
   country: "Australia"
@@ -73,7 +73,8 @@ const GOOGLE_NEWS_HOST = "news.google.com";
 const FEED_URL_OVERRIDES = {
   abc: "https://abcnews.com/abcnews/topstories",
   bloomberg: "https://www.bloomberg.com/feeds/politics/news.rss",
-  nhk: "https://news.google.com/rss/search?q=when%3A24h%20site%3Awww3.nhk.or.jp%2Fnews&hl=ja&gl=JP&ceid=JP%3Aja",
+  caixin: "https://news.google.com/rss/search?q=when%3A24h%20site%3Acaixinglobal.com&hl=en-US&gl=US&ceid=US%3Aen",
+  nhk: "https://news.google.com/rss/search?q=when%3A24h%20site%3Anhk.or.jp&hl=ja&gl=JP&ceid=JP%3Aja",
   tass: TASS_FEED_URL
 };
 const ALLOWED_HOSTS = new Set([
