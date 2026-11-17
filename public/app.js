@@ -542,6 +542,19 @@ function normalizeFeedDates(items) {
 // TRANSLATION ENGINE (Google Translate Free GTX Endpoint + LocalStorage Cache)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
 async function translateItemIfNeeded(item, targetLanguage) {
   if (!item.originalTitle) return item;
   const sourceLanguage = item.language.toLowerCase().split('-')[0];
@@ -559,10 +572,10 @@ async function translateItemIfNeeded(item, targetLanguage) {
     };
   }
 
-  // 1. Try Google Translate GTX first
+  // 1. Try Google Translate GTX first (with 3s timeout)
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(item.originalTitle)}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 3000);
     if (res.ok) {
       const data = await res.json();
       if (data && data[0] && Array.isArray(data[0])) {
@@ -579,14 +592,14 @@ async function translateItemIfNeeded(item, targetLanguage) {
       }
     }
   } catch (e) {
-    // Google failed / rate limited; proceed to MyMemory fallback
+    // Google failed / rate limited / timed out; proceed to MyMemory fallback
   }
 
-  // 2. Fallback to MyMemory API
+  // 2. Fallback to MyMemory API (with 3s timeout)
   try {
     const langPair = `${item.language}|${targetLanguage}`;
     const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.originalTitle)}&langpair=${encodeURIComponent(langPair)}`;
-    const res = await fetch(myMemoryUrl);
+    const res = await fetchWithTimeout(myMemoryUrl, {}, 3000);
     if (res.ok) {
       const data = await res.json();
       if (data && data.responseData && data.responseData.translatedText) {
@@ -603,7 +616,7 @@ async function translateItemIfNeeded(item, targetLanguage) {
       }
     }
   } catch (e) {
-    console.warn("MyMemory translation fallback failed:", e.message);
+    // MyMemory fallback failed or timed out
   }
 
   return { ...item, displayTitle: item.originalTitle, isTranslated: false };
