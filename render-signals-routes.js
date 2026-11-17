@@ -1,4 +1,7 @@
 // Seth's Signals routes & Source Health Monitor. Paste above app.listen().
+const { GetObjectCommand: GetObjCmd } = require("@aws-sdk/client-s3");
+const { randomUUID: randUuid, timingSafeEqual: timeSafeEq } = require("node:crypto");
+
 const SIGNALS_BUCKET = process.env.R2_BUCKET_NAME;
 const SIGNALS_KEY = "newsfeed/signals.json";
 const SIGNALS_TOKEN = process.env.SIGNALS_ADMIN_TOKEN;
@@ -14,7 +17,7 @@ function authorizeSignalsAdmin(req, res, next) {
   const expected = Buffer.from(SIGNALS_TOKEN);
   const provided = Buffer.from(match[1]);
 
-  if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
+  if (expected.length !== provided.length || !timeSafeEq(expected, provided)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -25,7 +28,7 @@ async function readSignals() {
   if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
 
   try {
-    const object = await s3.send(new GetObjectCommand({
+    const object = await s3.send(new GetObjCmd({
       Bucket: SIGNALS_BUCKET,
       Key: SIGNALS_KEY
     }));
@@ -142,7 +145,7 @@ app.get("/api/admin/sources-health", authorizeSignalsAdmin, async (req, res) => 
     if (!SIGNALS_BUCKET) throw new Error("R2_BUCKET_NAME is not configured");
     let snapshot = { feeds: {} };
     try {
-      const obj = await s3.send(new GetObjectCommand({
+      const obj = await s3.send(new GetObjCmd({
         Bucket: SIGNALS_BUCKET,
         Key: "newsfeed/cloudflare-news-snapshot-published.json"
       }));
@@ -209,7 +212,7 @@ app.post("/api/admin/signals", authorizeSignalsAdmin, async (req, res) => {
   try {
     const now = new Date().toISOString();
     const signal = {
-      id: randomUUID(),
+      id: randUuid(),
       ...validated.value,
       createdAt: now,
       updatedAt: now
