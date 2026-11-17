@@ -579,10 +579,9 @@ async function translateItemIfNeeded(item, targetLanguage) {
 
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(item.originalTitle)}`;
-    const res = await fetchWithTimeout(url, {}, 2500);
+    const res = await fetchWithTimeout(url, {}, 400);
     if (res.status === 429) {
       googleIsRateLimited = true;
-      console.warn("Google Translate rate-limited (429). Bypassing further network translations for instant loading.");
       return { ...item, displayTitle: item.originalTitle, isTranslated: false };
     }
     if (res.ok) {
@@ -601,7 +600,8 @@ async function translateItemIfNeeded(item, targetLanguage) {
       }
     }
   } catch (e) {
-    // Timeout or network error
+    // Timeout (400ms) or network error - trip rate limit flag to keep loading instant
+    googleIsRateLimited = true;
   }
 
   return { ...item, displayTitle: item.originalTitle, isTranslated: false };
