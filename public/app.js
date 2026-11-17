@@ -5,13 +5,13 @@ const NEWS_SNAPSHOT_URL = "/api/news-snapshot";
 // DEFAULT FALLBACK SOURCES DEFINITION
 const DEFAULT_SOURCES = [
   { id: "infobae", name: "Infobae", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Ainfobae.com&hl=es-419&gl=AR&ceid=AR%3Aes-419", language: "es", color: "#E91E63", country: "Argentina" },
-  { id: "caixin", name: "Caixin Global", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Acaixinglobal.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#D32F2F", country: "China" },
+  { id: "caixin", name: "Caixin Global", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20source%3ACaixin&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#D32F2F", country: "China" },
   { id: "the_paper", name: "The Paper (澎湃新闻)", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Athepaper.cn&hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans", language: "zh", color: "#D32F2F", country: "China" },
   { id: "rtve", name: "RTVE", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Artve.es&hl=es&gl=ES&ceid=ES%3Aes", language: "es", color: "#1565C0", country: "Spain" },
   { id: "scmp", name: "South China Morning Post", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Ascmp.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#C62828", country: "China" },
   { id: "xinhua", name: "Xinhua News", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Axinhuanet.com&hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans", language: "zh", color: "#B71C1C", country: "China" },
   { id: "abc_australia", name: "ABC News Australia", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Aabc.net.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen", language: "en", color: "#0097A7", country: "Australia" },
-  { id: "sbs", name: "SBS News", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen", language: "en", color: "#5D4037", country: "Australia" },
+  { id: "sbs", name: "SBS News", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen", language: "en", color: "#5D4037", country: "Australia" },
   { id: "mercopress", name: "MercoPress", feedUrl: "https://en.mercopress.com/rss/", language: "en", color: "#00838F", country: "Global" },
   { id: "reuters", name: "Reuters", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Areuters.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#F57C00", country: "Global" },
   { id: "france24", name: "France 24", feedUrl: "https://www.france24.com/fr/rss", language: "fr", color: "#1565C0", country: "France" },
@@ -20,7 +20,7 @@ const DEFAULT_SOURCES = [
   { id: "jpost", name: "Jerusalem Post", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20source%3AJerusalem%20Post&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#0288D1", country: "Israel" },
   { id: "times_of_israel", name: "Times of Israel", feedUrl: "https://www.timesofisrael.com/feed/", language: "en", color: "#00796B", country: "Israel" },
   { id: "ynet", name: "Ynet", feedUrl: "https://www.ynet.co.il/Integration/StoryRss1854.xml", language: "he", color: "#D32F2F", country: "Israel" },
-  { id: "nhk", name: "NHK News", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Anhk.or.jp&hl=ja&gl=JP&ceid=JP%3Aja", language: "ja", color: "#0277BD", country: "Japan" },
+  { id: "nhk", name: "NHK News", feedUrl: "https://www3.nhk.or.jp/rss/news/cat0.xml", language: "ja", color: "#0277BD", country: "Japan" },
   { id: "ria", name: "RIA Novosti", feedUrl: "https://ria.ru/export/rss2/index.xml", language: "ru", color: "#1565C0", country: "Russia" },
   { id: "tass", name: "TASS", feedUrl: "https://tass.com/rss/v2.xml", language: "en", color: "#0D47A1", country: "Russia" },
   { id: "al_arabiya", name: "Al Arabiya", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20%22Al%20Arabiya%22&hl=ar&gl=SA&ceid=SA%3Aar", language: "ar", color: "#2E7D32", country: "Saudi Arabia" },
@@ -539,21 +539,8 @@ function normalizeFeedDates(items) {
   return items;
 }
 
-// TRANSLATION ENGINE (Google Translate Free GTX Endpoint + MyMemory Backup + LocalStorage Cache)
+// TRANSLATION ENGINE (Google Translate Free GTX Endpoint + LocalStorage Cache)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
-
-async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(timeoutId);
-    return res;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    throw err;
-  }
-}
 
 async function translateItemIfNeeded(item, targetLanguage) {
   if (!item.originalTitle) return item;
@@ -572,51 +559,31 @@ async function translateItemIfNeeded(item, targetLanguage) {
     };
   }
 
-  // 1. Try Google Translate GTX first (fast 400ms timeout)
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(item.originalTitle)}`;
-    const res = await fetchWithTimeout(url, {}, 400);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data[0] && Array.isArray(data[0])) {
-        const translated = cleanText(data[0].map(x => x[0]).join(''));
-        if (translated) {
-          translationCache[cacheKey] = translated;
-          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
-          return {
-            ...item,
-            displayTitle: translated,
-            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
-          };
-        }
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`Headline translation request failed with HTTP ${res.status}.`);
+      return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+    }
+    const data = await res.json();
+    if (data && data[0] && Array.isArray(data[0])) {
+      const translated = cleanText(data[0].map(x => x[0]).join(''));
+      if (translated && translated.toLowerCase() !== item.originalTitle.toLowerCase()) {
+        translationCache[cacheKey] = translated;
+        localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
+        return {
+          ...item,
+          displayTitle: translated,
+          isTranslated: true
+        };
+      }
+      if (translated) {
+        return { ...item, displayTitle: translated, isTranslated: false };
       }
     }
   } catch (e) {
-    // Google failed / rate limited / timed out; proceed to MyMemory fallback
-  }
-
-  // 2. Fallback to MyMemory API (fast 1500ms timeout)
-  try {
-    const langPair = `${item.language}|${targetLanguage}`;
-    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.originalTitle)}&langpair=${encodeURIComponent(langPair)}`;
-    const res = await fetchWithTimeout(myMemoryUrl, {}, 1500);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.responseData && data.responseData.translatedText) {
-        const translated = cleanText(data.responseData.translatedText);
-        if (translated && !translated.startsWith('QUERY LENGTH LIMIT') && !translated.startsWith('INVALID')) {
-          translationCache[cacheKey] = translated;
-          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
-          return {
-            ...item,
-            displayTitle: translated,
-            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
-          };
-        }
-      }
-    }
-  } catch (e) {
-    // MyMemory fallback failed or timed out
+    console.warn(`Could not translate headline to ${headlineLanguageOptions[targetLanguage] || targetLanguage}:`, e.message);
   }
 
   return { ...item, displayTitle: item.originalTitle, isTranslated: false };
@@ -627,17 +594,7 @@ async function translateItemsForLanguage(items, targetLanguage) {
     return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
   }
 
-  const batchSize = 5;
-  const results = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.allSettled(batch.map(item => translateItemIfNeeded(item, targetLanguage)));
-    results.push(...batchResults);
-    if (i + batchSize < items.length) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }
-
+  const results = await Promise.allSettled(items.map(item => translateItemIfNeeded(item, targetLanguage)));
   return results.map((result, index) => (
     result.status === 'fulfilled'
       ? result.value
