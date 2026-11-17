@@ -72,7 +72,6 @@ const REGIONAL_SOURCE_IDS = new Set([...AUSTRALIA_SOURCE_IDS, ...LEBANON_SOURCE_
 const GOOGLE_NEWS_HOST = "news.google.com";
 const FEED_URL_OVERRIDES = {
   abc: "https://abcnews.com/abcnews/topstories",
-  amar_ujala: "https://news.google.com/rss/search?q=when%3A24h%20site%3Aamarujala.com&hl=hi&gl=IN&ceid=IN%3Ahi",
   bloomberg: "https://www.bloomberg.com/feeds/politics/news.rss",
   caixin: "https://news.google.com/rss/search?q=when%3A24h%20site%3Acaixinglobal.com&hl=en-US&gl=US&ceid=US%3Aen",
   nhk: "https://news.google.com/rss/search?q=when%3A24h%20site%3Anhk.or.jp&hl=ja&gl=JP&ceid=JP%3Aja",
