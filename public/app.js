@@ -34,7 +34,7 @@ const DEFAULT_SOURCES = [
   { id: "cbs", name: "CBS News", feedUrl: "https://www.cbsnews.com/latest/rss/main", language: "en", color: "#388E3C", country: "United States" },
   { id: "cnn", name: "CNN", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Acnn.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#B71C1C", country: "United States" },
   { id: "fox", name: "Fox News", feedUrl: "https://moxie.foxnews.com/google-publisher/latest.xml", language: "en", color: "#0D47A1", country: "United States" },
-  { id: "amar_ujala", name: "Amar Ujala", feedUrl: "https://www.amarujala.com/rss/india-news.xml", language: "hi", color: "#FF9933", country: "India" },
+  { id: "amar_ujala", name: "Amar Ujala", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20site%3Aamarujala.com&hl=hi&gl=IN&ceid=IN%3Ahi", language: "hi", color: "#FF9933", country: "India" },
   { id: "nbc", name: "NBC News", feedUrl: "https://feeds.nbcnews.com/nbcnews/public/news", language: "en", color: "#7B1FA2", country: "United States" }
 ];
 
