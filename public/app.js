@@ -357,7 +357,8 @@ headlineLanguageSelect?.addEventListener('change', () => {
     })
     .catch(error => console.warn('Could not translate headlines:', error));
 });
-openArticleTranslatedToggle.addEventListener('change', () => {
+openArticleTranslatedToggle?.addEventListener('change', () => {
+  if (!openArticleTranslatedToggle) return;
   openArticlesTranslated = openArticleTranslatedToggle.checked;
   localStorage.setItem('newsfeed_open_articles_translated', String(openArticlesTranslated));
 });
@@ -827,7 +828,7 @@ function renderFilterBar() {
 function openSettingsModal() {
   showSignalsToggle.checked = showSignals;
   if (headlineLanguageSelect) headlineLanguageSelect.value = headlineLanguage;
-  openArticleTranslatedToggle.checked = openArticlesTranslated;
+  if (openArticleTranslatedToggle) openArticleTranslatedToggle.checked = openArticlesTranslated;
   renderSourcesList();
   settingsModal.classList.remove('hidden');
 }
