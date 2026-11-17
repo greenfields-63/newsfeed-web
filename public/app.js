@@ -59,7 +59,7 @@ const headlineLanguageOptions = {
   none: 'None'
 };
 const savedHeadlineLanguage = localStorage.getItem('newsfeed_headline_language');
-let headlineLanguage = Object.hasOwn(headlineLanguageOptions, savedHeadlineLanguage) ? savedHeadlineLanguage : 'en';
+let headlineLanguage = Object.hasOwn(headlineLanguageOptions, savedHeadlineLanguage) ? savedHeadlineLanguage : 'none';
 let headlineTranslationRequest = 0;
 let selectedFilterId = null;
 let selectedFilterCountry = null;
