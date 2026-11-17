@@ -608,18 +608,25 @@ async function translateItemIfNeeded(item, targetLanguage) {
 }
 
 async function translateItemsForLanguage(items, targetLanguage) {
-  if (targetLanguage === 'none') {
+  if (targetLanguage === 'none' || googleIsRateLimited) {
     return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
   }
 
   const batchSize = 5;
   const results = [];
   for (let i = 0; i < items.length; i += batchSize) {
+    if (googleIsRateLimited) {
+      // If rate limited mid-batch, instantly return original titles for remaining items
+      for (let j = i; j < items.length; j++) {
+        results.push({ status: 'fulfilled', value: { ...items[j], displayTitle: items[j].originalTitle, isTranslated: false } });
+      }
+      break;
+    }
     const batch = items.slice(i, i + batchSize);
     const batchResults = await Promise.allSettled(batch.map(item => translateItemIfNeeded(item, targetLanguage)));
     results.push(...batchResults);
-    if (i + batchSize < items.length) {
-      await new Promise(resolve => setTimeout(resolve, 150));
+    if (i + batchSize < items.length && !googleIsRateLimited) {
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
