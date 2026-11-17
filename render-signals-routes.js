@@ -6,6 +6,8 @@ const SIGNALS_BUCKET = process.env.R2_BUCKET_NAME;
 const SIGNALS_KEY = "newsfeed/signals.json";
 const SIGNALS_TOKEN = process.env.SIGNALS_ADMIN_TOKEN;
 
+app.use(express.json({ limit: "16kb" }));
+
 function authorizeSignalsAdmin(req, res, next) {
   if (!SIGNALS_TOKEN || SIGNALS_TOKEN.length < 32) {
     return res.status(503).json({ error: "Signals admin is not configured" });
@@ -57,18 +59,18 @@ async function saveSignals(signals) {
 }
 
 function validateSignal(body) {
-  if (!body || typeof body.text !== "string" || !body.text.trim()) {
+  if (!body) return { error: "Signal text is required" };
+  const rawText = body.text || body.thought || body.content || "";
+  const text = String(rawText).trim();
+
+  if (!text) {
     return { error: "Signal text is required" };
   }
-
-  const text = body.text.trim();
   if (text.length > 2000) {
     return { error: "Signal text must be 2,000 characters or fewer" };
   }
 
-  if (body.status !== "draft" && body.status !== "published") {
-    return { error: "Choose draft or published status" };
-  }
+  const status = body.status === "published" ? "published" : "draft";
 
   if (body.links !== undefined && !Array.isArray(body.links)) {
     return { error: "Links must be a list" };
@@ -102,7 +104,7 @@ function validateSignal(body) {
     });
   }
 
-  return { value: { text, links, status: body.status } };
+  return { value: { text, links, status } };
 }
 
 const SOURCE_METADATA_ADMIN = [
@@ -392,7 +394,7 @@ async function loadSignals() {
     edit.textContent = "Edit";
     edit.onclick = () => {
       editingId = signal.id;
-      byId("signal-text").value = signal.text;
+      byId("signal-text").value = signal.text || "";
       byId("signal-links").value = (signal.links || [])
         .map(link => (link.title ? link.title + " | " : "") + link.url)
         .join("\\n");
@@ -406,12 +408,15 @@ async function loadSignals() {
     toggle.textContent = signal.status === "published" ? "Unpublish" : "Publish";
     toggle.onclick = async () => {
       try {
+        const newStatus = signal.status === "published" ? "draft" : "published";
+        const payload = {
+          text: signal.text || "",
+          links: signal.links || [],
+          status: newStatus
+        };
         await api("/api/admin/signals/" + encodeURIComponent(signal.id), {
           method: "PUT",
-          body: JSON.stringify({
-            ...signal,
-            status: signal.status === "published" ? "draft" : "published"
-          })
+          body: JSON.stringify(payload)
         });
         await loadSignals();
       } catch (error) {
