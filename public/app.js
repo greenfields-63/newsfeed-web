@@ -559,31 +559,51 @@ async function translateItemIfNeeded(item, targetLanguage) {
     };
   }
 
+  // 1. Try Google Translate GTX first
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(item.originalTitle)}`;
     const res = await fetch(url);
-    if (!res.ok) {
-      console.warn(`Headline translation request failed with HTTP ${res.status}.`);
-      return { ...item, displayTitle: item.originalTitle, isTranslated: false };
-    }
-    const data = await res.json();
-    if (data && data[0] && Array.isArray(data[0])) {
-      const translated = cleanText(data[0].map(x => x[0]).join(''));
-      if (translated && translated.toLowerCase() !== item.originalTitle.toLowerCase()) {
-        translationCache[cacheKey] = translated;
-        localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
-        return {
-          ...item,
-          displayTitle: translated,
-          isTranslated: true
-        };
-      }
-      if (translated) {
-        return { ...item, displayTitle: translated, isTranslated: false };
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data[0] && Array.isArray(data[0])) {
+        const translated = cleanText(data[0].map(x => x[0]).join(''));
+        if (translated) {
+          translationCache[cacheKey] = translated;
+          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
+          return {
+            ...item,
+            displayTitle: translated,
+            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
+          };
+        }
       }
     }
   } catch (e) {
-    console.warn(`Could not translate headline to ${headlineLanguageOptions[targetLanguage] || targetLanguage}:`, e.message);
+    // Google failed / rate limited; proceed to MyMemory fallback
+  }
+
+  // 2. Fallback to MyMemory API
+  try {
+    const langPair = `${item.language}|${targetLanguage}`;
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.originalTitle)}&langpair=${encodeURIComponent(langPair)}`;
+    const res = await fetch(myMemoryUrl);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.responseData && data.responseData.translatedText) {
+        const translated = cleanText(data.responseData.translatedText);
+        if (translated && !translated.startsWith('QUERY LENGTH LIMIT') && !translated.startsWith('INVALID')) {
+          translationCache[cacheKey] = translated;
+          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
+          return {
+            ...item,
+            displayTitle: translated,
+            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("MyMemory translation fallback failed:", e.message);
   }
 
   return { ...item, displayTitle: item.originalTitle, isTranslated: false };
@@ -594,7 +614,17 @@ async function translateItemsForLanguage(items, targetLanguage) {
     return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
   }
 
-  const results = await Promise.allSettled(items.map(item => translateItemIfNeeded(item, targetLanguage)));
+  const batchSize = 5;
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(batch.map(item => translateItemIfNeeded(item, targetLanguage)));
+    results.push(...batchResults);
+    if (i + batchSize < items.length) {
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+  }
+
   return results.map((result, index) => (
     result.status === 'fulfilled'
       ? result.value
