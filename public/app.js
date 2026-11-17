@@ -585,16 +585,8 @@ async function translateItemIfNeeded(item, targetLanguage) {
 }
 
 async function translateItemsForLanguage(items, targetLanguage) {
-  if (targetLanguage === 'none') {
-    return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
-  }
-
-  const results = await Promise.allSettled(items.map(item => translateItemIfNeeded(item, targetLanguage)));
-  return results.map((result, index) => (
-    result.status === 'fulfilled'
-      ? result.value
-      : { ...items[index], displayTitle: items[index].originalTitle, isTranslated: false }
-  ));
+  // OVERNIGHT SHUTDOWN: Bypass all translation requests until morning to clear IP rate limits
+  return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
 }
 
 // RENDER HEADLINES GRID / TICKER
