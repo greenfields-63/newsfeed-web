@@ -211,7 +211,7 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   });
 
   const fetchedAt = new Date().toISOString();
-  const generatedAt = new Date(scheduledTime + 5_000).toISOString();
+  const generatedAt = fetchedAt;
   const feeds = { ...previousFeeds };
   const errors = { ...(previousSnapshot?.errors || {}) };
   for (const result of results) {
