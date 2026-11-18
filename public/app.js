@@ -460,25 +460,36 @@ function filterRecentHeadlines(items) {
     .slice(0, 250);
 }
 
+// Poll twice per 10-minute refresh cycle: at :x9:55 (right after the snapshot
+// workers finish) and :x0:20 (a safety retry in case the cron ran late).
+function getNextNewsPollTime(now) {
+  const candidates = [];
+  for (let offset = 0; offset <= 12; offset++) {
+    const base = new Date(now + offset * 60 * 1000);
+    base.setSeconds(0, 0);
+    const minute = base.getMinutes();
+    let second = null;
+    if (minute % 10 === 9) {
+      second = 55;
+    } else if (minute % 10 === 0) {
+      second = 20;
+    }
+    if (second === null) continue;
+    const at = base.getTime() + second * 1000;
+    if (at > now + 500) candidates.push(at);
+  }
+  candidates.sort((a, b) => a - b);
+  return candidates.length ? candidates[0] : now + 60 * 1000;
+}
+
 function scheduleNextNewsRefresh() {
   if (newsRefreshTimeout !== null) clearTimeout(newsRefreshTimeout);
-
-  const intervalMs = 5 * 60 * 1000;
-  const publishGraceMs = 60 * 1000;
-  const publishRetryMs = 6 * 1000;
   const now = Date.now();
-  const currentTick = Math.floor(now / intervalMs) * intervalMs;
-  const snapshotTime = Date.parse(lastSnapshotGeneratedAt || '');
-  const publishIsPending = now - currentTick < publishGraceMs &&
-    (!Number.isFinite(snapshotTime) || snapshotTime < currentTick);
-  const nextTick = (Math.floor(now / intervalMs) + 1) * intervalMs;
-  const refreshAt = publishIsPending
-    ? Math.min(now + publishRetryMs, currentTick + publishGraceMs)
-    : nextTick + 8 * 1000;
+  const refreshAt = getNextNewsPollTime(now);
   newsRefreshTimeout = setTimeout(() => {
     newsRefreshTimeout = null;
     refreshNews();
-  }, refreshAt - Date.now());
+  }, Math.max(1000, refreshAt - now));
 }
 
 // PARSE RSS XML
