@@ -192,6 +192,7 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   const previousFeeds = previousSnapshot?.feeds || {};
 
   const results = await mapWithLimit(sourcesToFetch, sourcesToFetch.length, async source => {
+    const startTime = Date.now();
     try {
       const feedUrl = FEED_URL_OVERRIDES[source.id] || source.feedUrl;
       const xml = source.id === "cnn"
@@ -199,9 +200,12 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
         : new URL(feedUrl).hostname === "news.google.com"
           ? await fetchRenderProxyFeed(feedUrl)
           : await fetchRssFeed(feedUrl);
+      const duration = Date.now() - startTime;
+      console.log(`[PERF] ${source.id}: ${duration}ms`);
       return { id: source.id, xml };
     } catch (error) {
-      console.error(`Snapshot fetch failed for ${source.id}:`, error.message);
+      const duration = Date.now() - startTime;
+      console.error(`[PERF] ${source.id} FAILED (${duration}ms): ${error.message}`);
       return { id: source.id, error: error.message };
     }
   });
