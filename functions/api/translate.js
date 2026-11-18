@@ -134,7 +134,7 @@ async function translateChunk(env, chunk) {
       console.warn(`Translation batch length mismatch: expected ${texts.length}, got ${Array.isArray(parsed) ? parsed.length : "none"}`);
       return { out: null, error: "length_or_parse_mismatch", raw: text || JSON.stringify(result).slice(0, 800) };
     }
-    return { out: parsed.map(value => typeof value === "string" ? value : ""), error: null, raw };
+    return { out: parsed.map(value => typeof value === "string" ? value : ""), error: null, raw: text };
   } catch (error) {
     console.error("Workers AI translation failed:", error.message);
     return { out: null, error: error.message, raw: null };
