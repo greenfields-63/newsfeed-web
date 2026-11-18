@@ -51,6 +51,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   let added = 0;
+  let debugSample = null;
   if (pending.length && env.AI) {
     const chunks = [];
     for (let i = 0; i < pending.length; i += MAX_BATCH) {
@@ -59,7 +60,11 @@ export async function onRequestPost({ request, env }) {
     const results = await mapWithLimit(chunks, 3, chunk => translateChunk(env, chunk));
     for (let c = 0; c < chunks.length; c++) {
       const chunk = chunks[c];
-      const out = results[c];
+      const diag = results[c];
+      if (debugSample === null && diag && (diag.error || !Array.isArray(diag.out))) {
+        debugSample = { error: diag.error || null, raw: typeof diag.raw === "string" ? diag.raw.slice(0, 600) : null };
+      }
+      const out = diag ? diag.out : null;
       if (!Array.isArray(out) || out.length !== chunk.length) continue;
       for (let i = 0; i < chunk.length; i++) {
         const translated = typeof out[i] === "string" ? out[i].trim() : "";
@@ -87,7 +92,8 @@ export async function onRequestPost({ request, env }) {
       hasBucket: Boolean(env.NEWS_SNAPSHOT_BUCKET),
       pendingCount: pending.length,
       added,
-      requestedCount: cleaned.length
+      requestedCount: cleaned.length,
+      sample: debugSample
     };
   }
 
@@ -116,20 +122,20 @@ async function translateChunk(env, chunk) {
       temperature: 0,
       max_tokens: 2048
     });
-    const text = typeof result?.response === "string"
+    const raw = typeof result?.response === "string"
       ? result.response
       : typeof result?.response?.response === "string"
         ? result.response.response
         : "";
-    const parsed = extractJsonArray(text);
+    const parsed = extractJsonArray(raw);
     if (!Array.isArray(parsed) || parsed.length !== texts.length) {
       console.warn(`Translation batch length mismatch: expected ${texts.length}, got ${Array.isArray(parsed) ? parsed.length : "none"}`);
-      return null;
+      return { out: null, error: "length_or_parse_mismatch", raw };
     }
-    return parsed.map(value => typeof value === "string" ? value : "");
+    return { out: parsed.map(value => typeof value === "string" ? value : ""), error: null, raw };
   } catch (error) {
     console.error("Workers AI translation failed:", error.message);
-    return null;
+    return { out: null, error: error.message, raw: null };
   }
 }
 
