@@ -251,7 +251,14 @@ async function loadSourcesFromGist() {
         );
         ALL_SOURCES = [...data, ...supplementalSources]
           .sort((a, b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
-        const savedIds = JSON.parse(localStorage.getItem('newsfeed_enabled_sources') || '[]');
+        const rawSavedIds = localStorage.getItem('newsfeed_enabled_sources');
+        let savedIds = [];
+        try {
+          savedIds = rawSavedIds ? JSON.parse(rawSavedIds) : [];
+        } catch {
+          savedIds = [];
+        }
+        if (!Array.isArray(savedIds)) savedIds = [];
         if (savedIds.length > 0) {
           enabledSourceIds = new Set(savedIds);
           if (localStorage.getItem('newsfeed_the_paper_enabled_v1') !== 'true') {
@@ -282,6 +289,7 @@ async function loadSourcesFromGist() {
           }
         } else {
           enabledSourceIds = new Set(ALL_SOURCES.map(s => s.id));
+          savePreferences();
         }
       }
     }
