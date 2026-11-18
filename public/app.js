@@ -587,7 +587,7 @@ async function translateItemIfNeeded(item, targetLanguage) {
 }
 
 async function translateItemsForLanguage(items, targetLanguage) {
-  // OVERNIGHT SHUTDOWN: Bypass all translation requests until morning to clear IP rate limits
+  // Local browser translation mode: bypass server-side translation to avoid API errors and rate limits
   return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
 }
 
@@ -644,7 +644,7 @@ function renderHeadlines() {
             <span class="text-xs text-slate-400 font-medium shrink-0 min-w-[55px]">${formattedTime}</span>
             ${showTranslation ? `<span class="px-1.5 py-0.5 text-[9px] font-bold text-sky-300 bg-sky-950 border border-sky-800/60 rounded shrink-0">${translationBadge}</span>` : ''}
           </div>
-          <h3 class="ticker-headline text-sm font-semibold text-slate-100 group-hover:text-sky-300 transition min-w-0 sm:flex-1" title="${escapeHtml(displayTitle)}">
+          <h3 lang="${item.language || 'en'}" class="ticker-headline text-sm font-semibold text-slate-100 group-hover:text-sky-300 transition min-w-0 sm:flex-1" title="${escapeHtml(displayTitle)}">
             ${escapeHtml(displayTitle)}
           </h3>
         </div>
@@ -670,7 +670,7 @@ function renderHeadlines() {
               </span>
             ` : ''}
           </div>
-          <h3 class="text-base font-bold text-slate-100 group-hover:text-sky-400 transition leading-snug">
+          <h3 lang="${item.language || 'en'}" class="text-base font-bold text-slate-100 group-hover:text-sky-400 transition leading-snug">
             ${escapeHtml(displayTitle)}
           </h3>
         </div>
@@ -858,13 +858,18 @@ function renderSourcesList() {
       const val = document.createElement('label');
       val.className = 'flex items-center space-x-3 p-2.5 rounded-xl hover:bg-slate-800/60 cursor-pointer transition border border-transparent hover:border-slate-800 ml-2';
 
-      let langDesc = 'English';
-      if (source.language === 'he') langDesc = 'Hebrew ➔ Translated to EN';
-      if (source.language === 'ar') langDesc = 'Arabic ➔ Translated to EN';
-      if (source.language === 'ja') langDesc = 'Japanese ➔ Translated to EN';
-      if (source.language === 'zh') langDesc = 'Chinese ➔ Translated to EN';
-      if (source.language === 'ru') langDesc = 'Russian ➔ Translated to EN';
-      if (source.language === 'es') langDesc = 'Spanish ➔ Translated to EN';
+      const langNames = {
+        'en': 'English',
+        'es': 'Spanish',
+        'zh': 'Chinese',
+        'fr': 'French',
+        'he': 'Hebrew',
+        'ja': 'Japanese',
+        'ru': 'Russian',
+        'ar': 'Arabic',
+        'hi': 'Hindi'
+      };
+      const langDesc = langNames[source.language] || 'English';
 
       val.innerHTML = `
         <input type="checkbox" value="${source.id}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-sky-600 bg-slate-950 border-slate-700 focus:ring-sky-500">

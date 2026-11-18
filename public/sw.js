@@ -1,4 +1,4 @@
-const CACHE_NAME = 'newsfeed-cache-v4';
+const CACHE_NAME = 'newsfeed-cache-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
