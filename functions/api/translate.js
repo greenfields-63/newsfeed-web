@@ -70,6 +70,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   let added = 0;
+  let neurons = 0;
   if (pending.length && env.AI) {
     const chunks = [];
     for (let i = 0; i < pending.length; i += MAX_BATCH) {
@@ -78,7 +79,9 @@ export async function onRequestPost({ request, env }) {
     const results = await mapWithLimit(chunks, 3, chunk => translateChunk(env, chunk));
     for (let c = 0; c < chunks.length; c++) {
       const chunk = chunks[c];
-      const out = results[c];
+      const res = results[c];
+      if (res && typeof res.neurons === "number") neurons += res.neurons;
+      const out = res ? res.out : null;
       if (!Array.isArray(out) || out.length !== chunk.length) continue;
       for (let i = 0; i < chunk.length; i++) {
         const translated = typeof out[i] === "string" ? out[i].trim() : "";
@@ -99,7 +102,11 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
-  return Response.json({ translations }, {
+  const body = { translations };
+  if (payload && payload.debug === true) {
+    body.debug = { pending: pending.length, added, neurons: Number(neurons.toFixed(4)), requested: cleaned.length };
+  }
+  return Response.json(body, {
     headers: { "Cache-Control": "no-store" }
   });
 }
@@ -131,15 +138,16 @@ async function translateChunk(env, chunk) {
         : typeof result?.choices?.[0]?.message?.content === "string"
           ? result.choices[0].message.content
           : "";
+    const neurons = Number(result?.usage?.neurons ?? 0) || 0;
     const parsed = extractJsonArray(text);
     if (!Array.isArray(parsed) || parsed.length !== texts.length) {
       console.warn(`Translation batch length mismatch: expected ${texts.length}, got ${Array.isArray(parsed) ? parsed.length : "none"}`);
-      return null;
+      return { out: null, neurons };
     }
-    return parsed.map(value => typeof value === "string" ? value : "");
+    return { out: parsed.map(value => typeof value === "string" ? value : ""), neurons };
   } catch (error) {
     console.error("Workers AI translation failed:", error.message);
-    return null;
+    return { out: null, neurons: 0 };
   }
 }
 
