@@ -561,54 +561,79 @@ function normalizeFeedDates(items) {
   return items;
 }
 
-// TRANSLATION ENGINE (Google Translate Free GTX Endpoint + LocalStorage Cache)
+// TRANSLATION ENGINE (Cloudflare Workers AI via /api/translate, cached in localStorage)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
+const SERVER_TRANSLATION_TARGET = 'en';
 
-async function translateItemIfNeeded(item, targetLanguage) {
-  if (!item.originalTitle) return item;
-  const sourceLanguage = item.language.toLowerCase().split('-')[0];
-  const targetLanguageCode = targetLanguage.toLowerCase().split('-')[0];
-  if (targetLanguage === 'none' || sourceLanguage === targetLanguageCode) {
-    return { ...item, displayTitle: item.originalTitle, isTranslated: false };
-  }
-
-  const cacheKey = `${item.language}_${targetLanguage}_${item.originalTitle}`;
-  if (translationCache[cacheKey]) {
-    return {
-      ...item,
-      displayTitle: translationCache[cacheKey],
-      isTranslated: translationCache[cacheKey] !== item.originalTitle
-    };
-  }
-
+function saveTranslationCache() {
   try {
-    const proxyUrl = `https://worldcup-odds-backend.onrender.com/api/translate?q=${encodeURIComponent(item.originalTitle)}&sl=${encodeURIComponent(item.language)}&tl=${encodeURIComponent(targetLanguage)}`;
-    const res = await fetch(proxyUrl);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.translatedText) {
-        const translated = cleanText(data.translatedText);
-        if (translated) {
-          translationCache[cacheKey] = translated;
-          localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
-          return {
-            ...item,
-            displayTitle: translated,
-            isTranslated: translated.toLowerCase() !== item.originalTitle.toLowerCase()
-          };
-        }
-      }
-    }
+    localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
   } catch (e) {
-    console.warn("Translation proxy request failed:", e.message);
+    console.warn('Could not persist translation cache:', e.message);
   }
+}
 
-  return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+function translationCacheKey(item, targetLanguage) {
+  return `${item.language}_${targetLanguage}_${item.originalTitle}`;
 }
 
 async function translateItemsForLanguage(items, targetLanguage) {
-  // Local browser translation mode: bypass server-side translation to avoid API errors and rate limits
-  return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
+  if (!items.length) return items;
+  const targetCode = (targetLanguage || '').toLowerCase().split('-')[0];
+
+  // Only English is translated server-side; other languages rely on the browser translator.
+  if (targetCode !== SERVER_TRANSLATION_TARGET) {
+    return items.map(item => ({ ...item, displayTitle: item.originalTitle, isTranslated: false }));
+  }
+
+  const pending = [];
+  for (const item of items) {
+    if (!item.originalTitle) continue;
+    const sourceCode = (item.language || '').toLowerCase().split('-')[0];
+    if (sourceCode === SERVER_TRANSLATION_TARGET) continue;
+    if (translationCache[translationCacheKey(item, targetLanguage)]) continue;
+    pending.push(item);
+  }
+
+  if (pending.length) {
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: SERVER_TRANSLATION_TARGET,
+          items: pending.map(item => ({
+            id: item.id,
+            text: item.originalTitle,
+            lang: item.language || 'auto'
+          }))
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const translations = data && data.translations ? data.translations : {};
+        let changed = false;
+        for (const item of pending) {
+          const translated = translations[item.id];
+          if (typeof translated === 'string' && translated.trim()) {
+            translationCache[translationCacheKey(item, targetLanguage)] = cleanText(translated);
+            changed = true;
+          }
+        }
+        if (changed) saveTranslationCache();
+      }
+    } catch (e) {
+      console.warn('Translation request failed:', e.message);
+    }
+  }
+
+  return items.map(item => {
+    const translated = translationCache[translationCacheKey(item, targetLanguage)];
+    if (translated && translated !== item.originalTitle) {
+      return { ...item, displayTitle: translated, isTranslated: true };
+    }
+    return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+  });
 }
 
 // RENDER HEADLINES GRID / TICKER
