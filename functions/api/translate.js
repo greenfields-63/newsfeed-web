@@ -126,7 +126,9 @@ async function translateChunk(env, chunk) {
       ? result.response
       : typeof result?.response?.response === "string"
         ? result.response.response
-        : "";
+        : typeof result?.choices?.[0]?.message?.content === "string"
+          ? result.choices[0].message.content
+          : "";
     const parsed = extractJsonArray(text);
     if (!Array.isArray(parsed) || parsed.length !== texts.length) {
       console.warn(`Translation batch length mismatch: expected ${texts.length}, got ${Array.isArray(parsed) ? parsed.length : "none"}`);
