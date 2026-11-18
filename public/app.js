@@ -59,7 +59,7 @@ const headlineLanguageOptions = {
   none: 'None'
 };
 const savedHeadlineLanguage = localStorage.getItem('newsfeed_headline_language');
-let headlineLanguage = Object.hasOwn(headlineLanguageOptions, savedHeadlineLanguage) ? savedHeadlineLanguage : 'none';
+let headlineLanguage = Object.hasOwn(headlineLanguageOptions, savedHeadlineLanguage) ? savedHeadlineLanguage : 'en';
 let headlineTranslationRequest = 0;
 let selectedFilterId = null;
 let selectedFilterCountry = null;
@@ -91,12 +91,13 @@ const btnInstall = document.getElementById('btn-install');
 const signalsSection = document.getElementById('signals-section');
 const signalsList = document.getElementById('signals-list');
 const showSignalsToggle = document.getElementById('show-signals-toggle');
-const headlineLanguageSelect = document.getElementById('headline-language');
+const translateToEnglishToggle = document.getElementById('translate-to-english');
 const openArticleTranslatedToggle = document.getElementById('open-article-translated-toggle');
 
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
   updateViewToggleIcons();
+  if (translateToEnglishToggle) translateToEnglishToggle.checked = headlineLanguage === 'en';
   await loadSourcesFromGist();
   renderFilterBar();
   document.addEventListener('visibilitychange', () => {
@@ -324,11 +325,9 @@ showSignalsToggle.addEventListener('change', () => {
   localStorage.setItem('newsfeed_show_signals', String(showSignals));
   updateSignalsVisibility();
 });
-headlineLanguageSelect?.addEventListener('change', () => {
-  if (!headlineLanguageSelect) return;
-  headlineLanguage = Object.hasOwn(headlineLanguageOptions, headlineLanguageSelect.value)
-    ? headlineLanguageSelect.value
-    : 'none';
+translateToEnglishToggle?.addEventListener('change', () => {
+  if (!translateToEnglishToggle) return;
+  headlineLanguage = translateToEnglishToggle.checked ? 'en' : 'none';
   localStorage.setItem('newsfeed_headline_language', headlineLanguage);
   const requestId = ++headlineTranslationRequest;
   const targetLanguage = headlineLanguage;
@@ -872,7 +871,7 @@ function renderFilterBar() {
 // SETTINGS MODAL
 function openSettingsModal() {
   showSignalsToggle.checked = showSignals;
-  if (headlineLanguageSelect) headlineLanguageSelect.value = headlineLanguage;
+  if (translateToEnglishToggle) translateToEnglishToggle.checked = headlineLanguage === 'en';
   if (openArticleTranslatedToggle) openArticleTranslatedToggle.checked = openArticlesTranslated;
   renderSourcesList();
   settingsModal.classList.remove('hidden');

@@ -122,15 +122,15 @@ async function translateChunk(env, chunk) {
       temperature: 0,
       max_tokens: 2048
     });
-    const raw = typeof result?.response === "string"
+    const text = typeof result?.response === "string"
       ? result.response
       : typeof result?.response?.response === "string"
         ? result.response.response
         : "";
-    const parsed = extractJsonArray(raw);
+    const parsed = extractJsonArray(text);
     if (!Array.isArray(parsed) || parsed.length !== texts.length) {
       console.warn(`Translation batch length mismatch: expected ${texts.length}, got ${Array.isArray(parsed) ? parsed.length : "none"}`);
-      return { out: null, error: "length_or_parse_mismatch", raw };
+      return { out: null, error: "length_or_parse_mismatch", raw: text || JSON.stringify(result).slice(0, 800) };
     }
     return { out: parsed.map(value => typeof value === "string" ? value : ""), error: null, raw };
   } catch (error) {
