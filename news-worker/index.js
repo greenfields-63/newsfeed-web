@@ -141,10 +141,14 @@ function getSourceFeedHost(source) {
 }
 
 async function refreshSnapshot(env, scheduledTime = Date.now()) {
+  const totalStartTime = Date.now();
   const group = env.SNAPSHOT_GROUP || "core";
+
+  const gistStart = Date.now();
   const gistResponse = await fetch(SNAPSHOT_GIST_URL, {
     headers: { Accept: "application/json" }
   });
+  console.log(`[PERF] [${group}] Gist fetch: ${Date.now() - gistStart}ms`);
   if (!gistResponse.ok) {
     throw new Error(`Could not load source Gist: HTTP ${gistResponse.status}`);
   }
@@ -185,12 +189,15 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   }
 
   const snapshotKey = getSnapshotKey(env);
+  const r2ReadStart = Date.now();
   const previousObject = await env.NEWS_SNAPSHOT_BUCKET.get(snapshotKey);
+  console.log(`[PERF] [${group}] R2 read: ${Date.now() - r2ReadStart}ms`);
   const previousSnapshot = previousObject
     ? await previousObject.json()
     : null;
   const previousFeeds = previousSnapshot?.feeds || {};
 
+  const fetchWaveStart = Date.now();
   const results = await mapWithLimit(sourcesToFetch, sourcesToFetch.length, async source => {
     const startTime = Date.now();
     try {
@@ -201,14 +208,15 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
           ? await fetchRenderProxyFeed(feedUrl)
           : await fetchRssFeed(feedUrl);
       const duration = Date.now() - startTime;
-      console.log(`[PERF] ${source.id}: ${duration}ms`);
+      console.log(`[PERF] [${group}] ${source.id}: ${duration}ms`);
       return { id: source.id, xml };
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`[PERF] ${source.id} FAILED (${duration}ms): ${error.message}`);
+      console.error(`[PERF] [${group}] ${source.id} FAILED (${duration}ms): ${error.message}`);
       return { id: source.id, error: error.message };
     }
   });
+  console.log(`[PERF] [${group}] Total fetch wave for ${sourcesToFetch.length} sources: ${Date.now() - fetchWaveStart}ms`);
 
   const fetchedAt = new Date().toISOString();
   const generatedAt = fetchedAt;
@@ -225,6 +233,7 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   }
 
   const snapshot = { generatedAt, feeds, errors };
+  const r2WriteStart = Date.now();
   await env.NEWS_SNAPSHOT_BUCKET.put(snapshotKey, JSON.stringify(snapshot), {
     httpMetadata: {
       contentType: "application/json; charset=utf-8",
@@ -232,9 +241,10 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
     },
     customMetadata: { generatedAt }
   });
+  console.log(`[PERF] [${group}] R2 write: ${Date.now() - r2WriteStart}ms`);
 
   console.log(
-    `Snapshot saved to R2: ${results.filter(result => result.xml).length}/${sourcesToFetch.length} feeds successful`
+    `[PERF] [${group}] TOTAL execution time: ${Date.now() - totalStartTime}ms | Success: ${results.filter(result => result.xml).length}/${sourcesToFetch.length}`
   );
 }
 
