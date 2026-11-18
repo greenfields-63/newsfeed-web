@@ -23,8 +23,7 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: "Only English translation is supported" }, { status: 400 });
   }
 
-  const items = Array.isArray(payload?.items) ? payload.items.slice(0, MAX_ITEMS) : [];
-  const cleaned = items
+  const items = Array.isArray(payload?.items) ? payload.items.slice(0, MAX_ITEMS) : [];  const cleaned = items
     .filter(item => item && typeof item.id === "string" && typeof item.text === "string" && item.text.trim())
     .map(item => ({
       id: item.id,
@@ -81,7 +80,18 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
-  return Response.json({ translations }, {
+  const responseBody = { translations };
+  if (payload && payload.debug === true) {
+    responseBody.debug = {
+      hasAI: Boolean(env.AI),
+      hasBucket: Boolean(env.NEWS_SNAPSHOT_BUCKET),
+      pendingCount: pending.length,
+      added,
+      requestedCount: cleaned.length
+    };
+  }
+
+  return Response.json(responseBody, {
     headers: { "Cache-Control": "no-store" }
   });
 }
