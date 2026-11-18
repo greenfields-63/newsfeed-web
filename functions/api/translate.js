@@ -6,6 +6,24 @@ const MAX_ITEMS = 300;
 const MAX_CACHE_ENTRIES = 30000;
 const TARGET_NAME = "English";
 
+export async function onRequestGet({ env }) {
+  if (!env.NEWS_SNAPSHOT_BUCKET) {
+    return Response.json({ error: "Storage is not configured" }, { status: 503 });
+  }
+  const head = await env.NEWS_SNAPSHOT_BUCKET.head(CACHE_KEY);
+  if (!head) {
+    return Response.json({ exists: false });
+  }
+  const body = await env.NEWS_SNAPSHOT_BUCKET.get(CACHE_KEY);
+  const data = body ? await body.json().catch(() => ({})) : {};
+  return Response.json({
+    exists: true,
+    sizeBytes: head.size,
+    updatedAt: head.customMetadata?.updatedAt || null,
+    entries: Object.keys(data).length
+  });
+}
+
 export async function onRequestPost({ request, env }) {
   if (!env.NEWS_SNAPSHOT_BUCKET) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
