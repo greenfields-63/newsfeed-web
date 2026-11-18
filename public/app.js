@@ -429,7 +429,9 @@ async function refreshNews() {
     saveHeadlines();
 
     const snapshotDate = new Date(snapshot.generatedAt);
-    const updatedAt = Number.isNaN(snapshotDate.getTime()) ? new Date() : snapshotDate;
+    const updatedAt = Number.isNaN(snapshotDate.getTime())
+      ? new Date()
+      : roundToNearestTenMinutes(snapshotDate);
     lastUpdatedText.textContent = `Snapshot updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     if (!Number.isNaN(snapshotDate.getTime())) {
       lastSnapshotGeneratedAt = snapshotDate.toISOString();
@@ -480,6 +482,13 @@ function getNextNewsPollTime(now) {
   }
   candidates.sort((a, b) => a - b);
   return candidates.length ? candidates[0] : now + 60 * 1000;
+}
+
+// Snapshots are written a few seconds before the 10-minute mark (:x9:49), so
+// round the label to the nearest :x0 boundary for a clean "updated 05:20 PM".
+function roundToNearestTenMinutes(date) {
+  const stepMs = 10 * 60 * 1000;
+  return new Date(Math.round(date.getTime() / stepMs) * stepMs);
 }
 
 function scheduleNextNewsRefresh() {
