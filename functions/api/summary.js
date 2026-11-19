@@ -57,26 +57,22 @@ export async function onRequestGet(context) {
   if (!bucket) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
-  const url = new URL(request.url);
-  const forceRefresh = url.searchParams.get("refresh") === "1";
   const slot = getSlotInfo();
   const cacheKey = `newsfeed/summaries/v4/${slot.key}.json`;
 
-  if (!forceRefresh) {
-    try {
-      const cachedObject = await bucket.get(cacheKey);
-      if (cachedObject) {
-        const cached = await cachedObject.json().catch(() => null);
-        if (cached && Array.isArray(cached.regions) && cached.regions.length) {
-          return Response.json(
-            { status: "ready", slotKey: slot.key, generatedAt: cached.generatedAt, regions: cached.regions, cached: true },
-            { headers: { "Cache-Control": "no-store" } }
-          );
-        }
+  try {
+    const cachedObject = await bucket.get(cacheKey);
+    if (cachedObject) {
+      const cached = await cachedObject.json().catch(() => null);
+      if (cached && Array.isArray(cached.regions) && cached.regions.length) {
+        return Response.json(
+          { status: "ready", slotKey: slot.key, generatedAt: cached.generatedAt, regions: cached.regions, cached: true },
+          { headers: { "Cache-Control": "no-store" } }
+        );
       }
-    } catch (error) {
-      console.warn("Summary cache read failed:", error.message);
     }
+  } catch (error) {
+    console.warn("Summary cache read failed:", error.message);
   }
 
   if (!env.AI) {
