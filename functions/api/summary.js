@@ -14,7 +14,7 @@ const REGION_ORDER = [
   "Latin America",
   "Global"
 ];
-const MAX_TITLES_PER_REGION = 16;
+const MAX_TITLES_PER_REGION = 12;
 
 const REGION_OF_SOURCE = {
   infobae: "Latin America",
@@ -58,7 +58,7 @@ export async function onRequestGet(context) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v2/${slot.key}.json`;
 
   try {
     const cachedObject = await bucket.get(cacheKey);
@@ -90,7 +90,7 @@ export async function onRequestGet(context) {
       return Response.json({ error: "No headlines available to summarize yet" }, { status: 503 });
     }
 
-    const results = await mapWithLimit(targets, 4, target => summarizeRegion(env, target.region, target.titles));
+    const results = await mapWithLimit(targets, 3, target => summarizeRegion(env, target.region, target.titles));
     const regions = results.filter(Boolean);
     if (!regions.length) {
       return Response.json({ error: "Could not generate a summary" }, { status: 502 });
@@ -217,8 +217,9 @@ async function summarizeRegion(env, region, titles) {
     "You are a concise world-news editor.",
     `Write a short English briefing for the "${region}" region from the headlines provided.`,
     "Keep it neutral and factual. Do not invent details. Preserve names and places.",
-    'Respond ONLY with compact JSON: {"lead":"one or two sentence overview","bullets":["point 1","point 2","point 3"]}.',
-    "Use 2 to 4 bullets, each a short sentence. No markdown, no commentary."
+    "Translate non-English headlines into English as needed.",
+    'Respond with ONLY one compact JSON object, no markdown and no text outside it: {"lead":"one or two sentence overview","bullets":["point 1","point 2","point 3"]}.',
+    "Use 2 to 4 bullets, each a short sentence."
   ].join(" ");
 
   const user = [
@@ -227,39 +228,41 @@ async function summarizeRegion(env, region, titles) {
     ...titles.map((title, index) => `${index + 1}. ${title}`)
   ].join("\n");
 
-  try {
-    const result = await env.AI.run(AI_MODEL, {
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user }
-      ],
-      temperature: 0.2,
-      max_tokens: 600
-    });
-    const text = extractResponseText(result);
-    const parsed = extractJsonObject(text);
-    if (!parsed) {
-      console.warn(`Summary for ${region} returned unparseable output`);
-      return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await env.AI.run(AI_MODEL, {
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user }
+        ],
+        temperature: attempt === 0 ? 0.2 : 0,
+        max_tokens: 900
+      });
+      const text = extractResponseText(result);
+      const parsed = extractJsonObject(text);
+      if (parsed) {
+        const lead = typeof parsed.lead === "string" ? parsed.lead.trim() : "";
+        const bullets = Array.isArray(parsed.bullets)
+          ? parsed.bullets
+              .map(bullet => (typeof bullet === "string" ? bullet.trim() : ""))
+              .filter(Boolean)
+              .slice(0, 4)
+          : [];
+        if (lead || bullets.length) {
+          return {
+            region,
+            lead: lead || bullets[0] || "",
+            bullets: lead ? bullets : bullets.slice(1),
+            sourceCount: titles.length
+          };
+        }
+      }
+      console.warn(`Summary for ${region} attempt ${attempt + 1} was unparseable`);
+    } catch (error) {
+      console.error(`Summary generation for ${region} attempt ${attempt + 1} failed:`, error.message);
     }
-    const lead = typeof parsed.lead === "string" ? parsed.lead.trim() : "";
-    const bullets = Array.isArray(parsed.bullets)
-      ? parsed.bullets
-          .map(bullet => (typeof bullet === "string" ? bullet.trim() : ""))
-          .filter(Boolean)
-          .slice(0, 4)
-      : [];
-    if (!lead && !bullets.length) return null;
-    return {
-      region,
-      lead: lead || bullets[0] || "",
-      bullets: lead ? bullets : bullets.slice(1),
-      sourceCount: titles.length
-    };
-  } catch (error) {
-    console.error(`Summary generation for ${region} failed:`, error.message);
-    return null;
   }
+  return null;
 }
 
 function extractResponseText(result) {
