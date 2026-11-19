@@ -174,8 +174,15 @@ async function translateChunk(env, chunk) {
     }
     return { out: parsed.map(value => typeof value === "string" ? value : ""), neurons };
   } catch (error) {
-    console.error("Workers AI translation failed:", error.message);
-    return { out: null, neurons: 0, error: `ai_error: ${error.message}` };
+    const detail = {
+      name: error?.name ?? null,
+      code: error?.code ?? null,
+      status: error?.status ?? null,
+      cause: error?.cause?.message ?? null,
+      message: error?.message ?? String(error)
+    };
+    console.error("Workers AI translation failed:", detail);
+    return { out: null, neurons: 0, error: `ai_error: ${JSON.stringify(detail)}` };
   }
 }
 
