@@ -866,11 +866,10 @@ function renderSummary(data) {
     summaryUpdated.textContent = data.slotName ? `${data.slotName} · ${time}` : time;
   }
 
-  regions.forEach((entry, index) => {
+  regions.forEach((entry) => {
     if (!entry || typeof entry.region !== 'string') return;
     const details = document.createElement('details');
     details.className = 'group rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2';
-    if (index === 0) details.open = true;
 
     const head = document.createElement('summary');
     head.className = 'flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-100';
