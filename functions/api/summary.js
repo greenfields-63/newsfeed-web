@@ -52,27 +52,31 @@ const REGION_OF_SOURCE = {
 };
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
   const bucket = env.NEWS_SNAPSHOT_BUCKET;
   if (!bucket) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
+  const url = new URL(request.url);
+  const forceRefresh = url.searchParams.get("refresh") === "1";
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/v2/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v3/${slot.key}.json`;
 
-  try {
-    const cachedObject = await bucket.get(cacheKey);
-    if (cachedObject) {
-      const cached = await cachedObject.json().catch(() => null);
-      if (cached && Array.isArray(cached.regions) && cached.regions.length) {
-        return Response.json(
-          { status: "ready", slotKey: slot.key, generatedAt: cached.generatedAt, regions: cached.regions, cached: true },
-          { headers: { "Cache-Control": "no-store" } }
-        );
+  if (!forceRefresh) {
+    try {
+      const cachedObject = await bucket.get(cacheKey);
+      if (cachedObject) {
+        const cached = await cachedObject.json().catch(() => null);
+        if (cached && Array.isArray(cached.regions) && cached.regions.length) {
+          return Response.json(
+            { status: "ready", slotKey: slot.key, generatedAt: cached.generatedAt, regions: cached.regions, cached: true },
+            { headers: { "Cache-Control": "no-store" } }
+          );
+        }
       }
+    } catch (error) {
+      console.warn("Summary cache read failed:", error.message);
     }
-  } catch (error) {
-    console.warn("Summary cache read failed:", error.message);
   }
 
   if (!env.AI) {
@@ -90,10 +94,11 @@ export async function onRequestGet(context) {
       return Response.json({ error: "No headlines available to summarize yet" }, { status: 503 });
     }
 
-    const results = await mapWithLimit(targets, 3, target => summarizeRegion(env, target.region, target.titles));
+    const results = await mapWithLimit(targets, 1, target => summarizeRegion(env, target.region, target.titles));
     const regions = results.filter(Boolean);
+    const failedRegions = targets.filter((_, index) => !results[index]).map(target => target.region);
     if (!regions.length) {
-      return Response.json({ error: "Could not generate a summary" }, { status: 502 });
+      return Response.json({ error: "Could not generate a summary", failedRegions }, { status: 502 });
     }
 
     const payload = {
@@ -107,7 +112,7 @@ export async function onRequestGet(context) {
     });
 
     return Response.json(
-      { status: "ready", slotKey: slot.key, generatedAt: payload.generatedAt, regions, cached: false },
+      { status: "ready", slotKey: slot.key, generatedAt: payload.generatedAt, regions, failedRegions, cached: false },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
@@ -228,7 +233,7 @@ async function summarizeRegion(env, region, titles) {
     ...titles.map((title, index) => `${index + 1}. ${title}`)
   ].join("\n");
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const result = await env.AI.run(AI_MODEL, {
         messages: [
