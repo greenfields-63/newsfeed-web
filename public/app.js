@@ -894,20 +894,6 @@ function renderSummary(data) {
       });
       body.appendChild(ul);
     }
-    const showBtn = document.createElement('button');
-    showBtn.type = 'button';
-    showBtn.className = 'inline-flex items-center gap-1 text-xs font-semibold text-sky-400 hover:text-sky-300';
-    showBtn.textContent = selectedFilterRegion === entry.region ? 'Clear region filter ✕' : 'Show in feed →';
-    showBtn.addEventListener('click', event => {
-      event.preventDefault();
-      selectedFilterRegion = selectedFilterRegion === entry.region ? null : entry.region;
-      selectedFilterId = null;
-      selectedFilterCountry = null;
-      renderFilterBar();
-      renderHeadlines();
-      document.getElementById('news-feed')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    body.appendChild(showBtn);
     details.appendChild(body);
     summaryRegions.appendChild(details);
   });
