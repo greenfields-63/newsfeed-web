@@ -71,6 +71,7 @@ export async function onRequestPost({ request, env }) {
 
   let added = 0;
   let neurons = 0;
+  let firstError = null;
   if (pending.length && env.AI) {
     const chunks = [];
     for (let i = 0; i < pending.length; i += MAX_BATCH) {
@@ -81,6 +82,7 @@ export async function onRequestPost({ request, env }) {
       const chunk = chunks[c];
       const res = results[c];
       if (res && typeof res.neurons === "number") neurons += res.neurons;
+      if (res && res.error && !firstError) firstError = res.error;
       const out = res ? res.out : null;
       if (!Array.isArray(out) || out.length !== chunk.length) continue;
       for (let i = 0; i < chunk.length; i++) {
@@ -104,7 +106,14 @@ export async function onRequestPost({ request, env }) {
 
   const body = { translations };
   if (payload && payload.debug === true) {
-    body.debug = { pending: pending.length, added, neurons: Number(neurons.toFixed(4)), requested: cleaned.length };
+    body.debug = {
+      pending: pending.length,
+      added,
+      neurons: Number(neurons.toFixed(4)),
+      requested: cleaned.length,
+      hasAI: Boolean(env.AI),
+      error: firstError
+    };
   }
   return Response.json(body, {
     headers: { "Cache-Control": "no-store" }
@@ -142,12 +151,13 @@ async function translateChunk(env, chunk) {
     const parsed = extractJsonArray(text);
     if (!Array.isArray(parsed) || parsed.length !== texts.length) {
       console.warn(`Translation batch length mismatch: expected ${texts.length}, got ${Array.isArray(parsed) ? parsed.length : "none"}`);
-      return { out: null, neurons };
+      const snippet = text ? text.slice(0, 120) : `empty output (${JSON.stringify(result).slice(0, 120)})`;
+      return { out: null, neurons, error: `parse_mismatch: ${snippet}` };
     }
     return { out: parsed.map(value => typeof value === "string" ? value : ""), neurons };
   } catch (error) {
     console.error("Workers AI translation failed:", error.message);
-    return { out: null, neurons: 0 };
+    return { out: null, neurons: 0, error: `ai_error: ${error.message}` };
   }
 }
 
