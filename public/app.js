@@ -255,7 +255,7 @@ async function loadSourcesFromGist() {
       if (Array.isArray(data) && data.length > 0) {
         const gistIds = new Set(data.map(source => source.id));
         const supplementalSources = DEFAULT_SOURCES.filter(
-          source => ['the_paper', 'rtve', 'abc_australia', 'sbs', 'al_akhbar', 'an_nahar'].includes(source.id) && !gistIds.has(source.id)
+          source => ['the_paper', 'rtve', 'abc_australia', 'sbs', 'al_akhbar', 'an_nahar', 'cnbc'].includes(source.id) && !gistIds.has(source.id)
         );
         ALL_SOURCES = [...data, ...supplementalSources]
           .sort((a, b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
@@ -278,6 +278,11 @@ async function loadSourcesFromGist() {
             enabledSourceIds.add('rtve');
             savePreferences();
             localStorage.setItem('newsfeed_rtve_enabled_v1', 'true');
+          }
+          if (localStorage.getItem('newsfeed_cnbc_enabled_v1') !== 'true') {
+            enabledSourceIds.add('cnbc');
+            savePreferences();
+            localStorage.setItem('newsfeed_cnbc_enabled_v1', 'true');
           }
           for (const sourceId of ['abc_australia', 'sbs']) {
             const migrationKey = `newsfeed_${sourceId}_enabled_v1`;

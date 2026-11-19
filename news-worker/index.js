@@ -58,13 +58,22 @@ const AN_NAHAR_SOURCE = {
   color: "#1565C0",
   country: "Lebanon"
 };
+const CNBC_SOURCE = {
+  id: "cnbc",
+  name: "CNBC",
+  feedUrl: "https://search.cnbc.com/rs/search/combinednavbarpage.xml?partnerId=2000&id=100003114",
+  language: "en",
+  color: "#0082C8",
+  country: "United States"
+};
 const SUPPLEMENTAL_SOURCES = [
   THE_PAPER_SOURCE,
   RTVE_SOURCE,
   ABC_AUSTRALIA_SOURCE,
   SBS_SOURCE,
   AL_AKHBAR_SOURCE,
-  AN_NAHAR_SOURCE
+  AN_NAHAR_SOURCE,
+  CNBC_SOURCE
 ];
 const AUSTRALIA_SOURCE_IDS = new Set(["abc_australia", "sbs"]);
 const LEBANON_SOURCE_IDS = new Set(["al_akhbar", "an_nahar"]);
