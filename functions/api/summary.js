@@ -3,7 +3,7 @@ const PARTITION_SNAPSHOT_KEYS = [
   "newsfeed/cloudflare-news-snapshot-google.json",
   "newsfeed/cloudflare-news-snapshot-regional.json"
 ];
-const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8-fast";
+const AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const REGION_ORDER = [
   "Middle East",
   "Europe",
@@ -59,7 +59,7 @@ export async function onRequestGet(context) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/v5/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v6/${slot.key}.json`;
 
   try {
     const cachedObject = await bucket.get(cacheKey);
