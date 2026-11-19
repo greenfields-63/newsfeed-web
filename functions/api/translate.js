@@ -1,5 +1,5 @@
 const CACHE_KEY = "newsfeed/translations-cache.json";
-const AI_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8-fast";
 const TARGET = "en";
 const MAX_BATCH = 40;
 const MAX_ITEMS = 300;
