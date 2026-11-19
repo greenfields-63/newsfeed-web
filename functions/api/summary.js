@@ -59,7 +59,7 @@ export async function onRequestGet(context) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/v4/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v5/${slot.key}.json`;
 
   try {
     const cachedObject = await bucket.get(cacheKey);
@@ -220,7 +220,9 @@ async function summarizeRegion(env, region, titles) {
   const system = [
     "You are a concise world-news editor.",
     `Write a short English briefing for the "${region}" region from the headlines provided.`,
-    "Keep it neutral and factual. Do not invent details. Preserve names and places. Translate non-English headlines into English as needed.",
+    "Use ONLY the information written in the headlines. Do not add titles, honorifics, roles, party affiliations, first names, or background facts that are not explicitly stated in a headline.",
+    "Refer to each person and place exactly as the headlines name them (e.g. if a headline says 'Trump', write 'Trump' with no added title or descriptor).",
+    "Keep it neutral and factual. Do not invent or infer details. Translate non-English headlines into English as needed.",
     "Respond in EXACTLY this plain-text format, with nothing before or after it:",
     "LEAD: <one or two sentence overview>",
     "- <bullet 1>",
@@ -242,7 +244,7 @@ async function summarizeRegion(env, region, titles) {
           { role: "system", content: system },
           { role: "user", content: user }
         ],
-        temperature: attempt === 0 ? 0.2 : 0,
+        temperature: attempt === 0 ? 0.1 : 0,
         max_tokens: 900
       });
       const parsed = parseSummaryText(extractResponseText(result));
