@@ -52,6 +52,9 @@
     .signal-summary::-webkit-details-marker {
       display: none;
     }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
     .signal-preview {
       display: -webkit-box;
       -webkit-box-orient: vertical;
@@ -172,17 +175,22 @@
     </section>
 
     <!-- Regional AI Briefing -->
-    <section id="summary-section" class="hidden mb-4 rounded-2xl border border-sky-500/25 bg-slate-900/70 p-3 sm:p-4 shadow-lg">
-      <div class="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
-        <div>
-          <h2 class="text-base font-extrabold tracking-tight text-sky-300">Regional Briefing</h2>
-          <p class="hidden sm:block mt-1 text-xs text-slate-400">AI summary of recent headlines by region · refreshes 3× daily</p>
-        </div>
-        <span id="summary-updated" class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200"></span>
+    <details id="summary-section" class="hidden group mb-4 rounded-2xl border border-sky-500/25 bg-slate-900/70 shadow-lg">
+      <summary class="briefing-summary flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 sm:px-4">
+        <span class="flex min-w-0 items-center gap-2.5">
+          <svg class="h-4 w-4 shrink-0 text-sky-400 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="min-w-0">
+            <span class="block text-base font-extrabold tracking-tight text-sky-300">Regional Briefing</span>
+            <span class="hidden truncate text-xs text-slate-400 sm:block">AI summary by region · refreshes 3× daily</span>
+          </span>
+        </span>
+        <span id="summary-updated" class="shrink-0 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200"></span>
+      </summary>
+      <div class="px-3 pb-3 sm:px-4 sm:pb-4">
+        <div id="summary-regions" class="space-y-2"></div>
+        <p id="summary-status" class="mt-2 text-xs text-slate-400"></p>
       </div>
-      <div id="summary-regions" class="space-y-2"></div>
-      <p id="summary-status" class="text-xs text-slate-400"></p>
-    </section>
+    </details>
 
     <!-- Status / Loading Indicator -->
     <div id="loading-state" class="flex flex-col items-center justify-center py-20 text-center">
