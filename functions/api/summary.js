@@ -67,7 +67,7 @@ export async function onRequestGet(context) {
       const cached = await cachedObject.json().catch(() => null);
       if (cached && Array.isArray(cached.regions) && cached.regions.length) {
         return Response.json(
-          { status: "ready", slotKey: slot.key, generatedAt: cached.generatedAt, regions: cached.regions, cached: true },
+          { status: "ready", slotKey: slot.key, slotName: slot.name, slotStart: slot.start.toISOString(), generatedAt: cached.generatedAt, regions: cached.regions, cached: true },
           { headers: { "Cache-Control": "no-store" } }
         );
       }
@@ -109,7 +109,7 @@ export async function onRequestGet(context) {
     });
 
     return Response.json(
-      { status: "ready", slotKey: slot.key, generatedAt: payload.generatedAt, regions, failedRegions, cached: false },
+      { status: "ready", slotKey: slot.key, slotName: slot.name, slotStart: slot.start.toISOString(), generatedAt: payload.generatedAt, regions, failedRegions, cached: false },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
@@ -134,7 +134,9 @@ function getSlotInfo(now = new Date()) {
   ));
   if (hour < 6) start.setUTCDate(start.getUTCDate() - 1);
 
-  return { key: start.toISOString().slice(0, 13), start };
+  const name = slotHour === 6 ? "Morning" : slotHour === 12 ? "Afternoon" : "Evening";
+
+  return { key: start.toISOString().slice(0, 13), start, name };
 }
 
 async function loadMergedFeeds(bucket) {

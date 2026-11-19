@@ -860,9 +860,10 @@ function renderSummary(data) {
   summaryRegions.innerHTML = '';
   if (summaryStatus) summaryStatus.textContent = '';
   if (summaryUpdated) {
-    summaryUpdated.textContent = data.generatedAt
+    const time = data.generatedAt
       ? new Date(data.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
+    summaryUpdated.textContent = data.slotName ? `${data.slotName} · ${time}` : time;
   }
 
   regions.forEach((entry, index) => {
