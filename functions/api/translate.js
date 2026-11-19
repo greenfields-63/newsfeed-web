@@ -1,10 +1,5 @@
 const CACHE_KEY = "newsfeed/translations-cache.json";
 const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8-fast";
-const DEBUG_MODELS = new Set([
-  "@cf/meta/llama-3.1-8b-instruct-fp8-fast",
-  "@cf/meta/llama-3.2-3b-instruct",
-  "@cf/meta/llama-3.2-1b-instruct"
-]);
 const TARGET = "en";
 const MAX_BATCH = 40;
 const MAX_ITEMS = 300;
@@ -102,8 +97,7 @@ export async function onRequestPost({ request, env }) {
     for (let i = 0; i < pending.length; i += MAX_BATCH) {
       chunks.push(pending.slice(i, i + MAX_BATCH));
     }
-    const activeModel = payload?.debug === true && DEBUG_MODELS.has(payload.model) ? payload.model : AI_MODEL;
-    const results = await mapWithLimit(chunks, 3, chunk => translateChunk(env, chunk, activeModel));
+    const results = await mapWithLimit(chunks, 3, chunk => translateChunk(env, chunk));
     for (let c = 0; c < chunks.length; c++) {
       const chunk = chunks[c];
       const res = results[c];
@@ -145,7 +139,7 @@ export async function onRequestPost({ request, env }) {
   });
 }
 
-async function translateChunk(env, chunk, model = AI_MODEL) {
+async function translateChunk(env, chunk) {
   const texts = chunk.map(item => item.text);
   const system = [
     `Translate each headline to ${TARGET_NAME}.`,
@@ -156,7 +150,7 @@ async function translateChunk(env, chunk, model = AI_MODEL) {
   ].join(" ");
 
   try {
-    const result = await env.AI.run(model, {
+    const result = await env.AI.run(AI_MODEL, {
       messages: [
         { role: "system", content: system },
         { role: "user", content: JSON.stringify(texts) }
