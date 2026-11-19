@@ -60,7 +60,7 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const forceRefresh = url.searchParams.get("refresh") === "1";
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/v3/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v4/${slot.key}.json`;
 
   if (!forceRefresh) {
     try {
@@ -221,11 +221,14 @@ async function summarizeRegion(env, region, titles) {
   const system = [
     "You are a concise world-news editor.",
     `Write a short English briefing for the "${region}" region from the headlines provided.`,
-    "Keep it neutral and factual. Do not invent details. Preserve names and places.",
-    "Translate non-English headlines into English as needed.",
-    'Respond with ONLY one compact JSON object, no markdown and no text outside it: {"lead":"one or two sentence overview","bullets":["point 1","point 2","point 3"]}.',
-    "Use 2 to 4 bullets, each a short sentence."
-  ].join(" ");
+    "Keep it neutral and factual. Do not invent details. Preserve names and places. Translate non-English headlines into English as needed.",
+    "Respond in EXACTLY this plain-text format, with nothing before or after it:",
+    "LEAD: <one or two sentence overview>",
+    "- <bullet 1>",
+    "- <bullet 2>",
+    "- <bullet 3>",
+    "Use 2 to 4 bullets. Plain text only: no JSON, no markdown fences, no extra commentary."
+  ].join("\n");
 
   const user = [
     `Region: ${region}`,
@@ -243,24 +246,14 @@ async function summarizeRegion(env, region, titles) {
         temperature: attempt === 0 ? 0.2 : 0,
         max_tokens: 900
       });
-      const text = extractResponseText(result);
-      const parsed = extractJsonObject(text);
+      const parsed = parseSummaryText(extractResponseText(result));
       if (parsed) {
-        const lead = typeof parsed.lead === "string" ? parsed.lead.trim() : "";
-        const bullets = Array.isArray(parsed.bullets)
-          ? parsed.bullets
-              .map(bullet => (typeof bullet === "string" ? bullet.trim() : ""))
-              .filter(Boolean)
-              .slice(0, 4)
-          : [];
-        if (lead || bullets.length) {
-          return {
-            region,
-            lead: lead || bullets[0] || "",
-            bullets: lead ? bullets : bullets.slice(1),
-            sourceCount: titles.length
-          };
-        }
+        return {
+          region,
+          lead: parsed.lead || parsed.bullets[0] || "",
+          bullets: parsed.lead ? parsed.bullets : parsed.bullets.slice(1),
+          sourceCount: titles.length
+        };
       }
       console.warn(`Summary for ${region} attempt ${attempt + 1} was unparseable`);
     } catch (error) {
@@ -270,26 +263,34 @@ async function summarizeRegion(env, region, titles) {
   return null;
 }
 
+function parseSummaryText(text) {
+  if (!text) return null;
+  let cleaned = text.trim();
+  const fence = cleaned.match(/```(?:[a-z]*)\s*([\s\S]*?)```/i);
+  if (fence) cleaned = fence[1].trim();
+
+  let lead = "";
+  const bullets = [];
+  for (const rawLine of cleaned.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const leadMatch = line.match(/^LEAD\s*:\s*(.+)$/i);
+    if (leadMatch) {
+      lead = leadMatch[1].trim();
+      continue;
+    }
+    const bulletMatch = line.match(/^[-•*]\s+(.+)$/);
+    if (bulletMatch) bullets.push(bulletMatch[1].trim());
+  }
+  if (!lead && !bullets.length) return null;
+  return { lead, bullets: bullets.slice(0, 4) };
+}
+
 function extractResponseText(result) {
   if (typeof result?.response === "string") return result.response;
   if (typeof result?.response?.response === "string") return result.response.response;
   if (typeof result?.choices?.[0]?.message?.content === "string") return result.choices[0].message.content;
   return "";
-}
-
-function extractJsonObject(text) {
-  if (!text) return null;
-  let cleaned = text.trim();
-  const fence = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence) cleaned = fence[1].trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1 || end < start) return null;
-  try {
-    return JSON.parse(cleaned.slice(start, end + 1));
-  } catch {
-    return null;
-  }
 }
 
 async function mapWithLimit(items, limit, callback) {
