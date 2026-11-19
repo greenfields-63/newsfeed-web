@@ -156,7 +156,8 @@ async function translateChunk(env, chunk) {
         { role: "user", content: JSON.stringify(texts) }
       ],
       temperature: 0,
-      max_tokens: 2048
+      max_tokens: 2048,
+      chat_template_kwargs: { enable_thinking: false }
     });
     const text = typeof result?.response === "string"
       ? result.response
