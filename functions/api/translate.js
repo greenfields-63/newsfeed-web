@@ -42,15 +42,21 @@ export async function onRequestPost({ request, env }) {
   }
 
   const items = Array.isArray(payload?.items) ? payload.items.slice(0, MAX_ITEMS) : [];
-  const cleaned = items
-    .filter(item => item && typeof item.id === "string" && typeof item.text === "string" && item.text.trim())
-    .map(item => ({
-      id: item.id,
-      text: item.text,
-      lang: typeof item.lang === "string" && item.lang ? item.lang : "auto"
-    }));
+  const groups = new Map();
+  for (const item of items) {
+    if (!item || typeof item.id !== "string" || typeof item.text !== "string") continue;
+    const text = normalizeText(item.text);
+    if (!text) continue;
+    let group = groups.get(text);
+    if (!group) {
+      group = { text, ids: [], langs: new Set() };
+      groups.set(text, group);
+    }
+    group.ids.push(item.id);
+    if (typeof item.lang === "string" && item.lang) group.langs.add(item.lang);
+  }
 
-  if (!cleaned.length) {
+  if (!groups.size) {
     return Response.json({ translations: {} }, { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -60,12 +66,26 @@ export async function onRequestPost({ request, env }) {
 
   const translations = {};
   const pending = [];
-  for (const item of cleaned) {
-    const key = hashKey(`${item.lang}|${item.text}`);
-    if (typeof cache[key] === "string" && cache[key]) {
-      translations[item.id] = cache[key];
+  let newlyAliased = false;
+  for (const group of groups.values()) {
+    const key = hashKey(group.text);
+    let value = typeof cache[key] === "string" ? cache[key] : "";
+    if (!value) {
+      // Reuse legacy lang|text entries so already-paid translations aren't billed again.
+      for (const lang of group.langs) {
+        const legacyKey = hashKey(`${lang}|${group.text}`);
+        if (typeof cache[legacyKey] === "string" && cache[legacyKey]) {
+          value = cache[legacyKey];
+          cache[key] = value;
+          newlyAliased = true;
+          break;
+        }
+      }
+    }
+    if (value) {
+      for (const id of group.ids) translations[id] = value;
     } else {
-      pending.push(item);
+      pending.push(group);
     }
   }
 
@@ -88,15 +108,14 @@ export async function onRequestPost({ request, env }) {
       for (let i = 0; i < chunk.length; i++) {
         const translated = typeof out[i] === "string" ? out[i].trim() : "";
         if (!translated) continue;
-        const key = hashKey(`${chunk[i].lang}|${chunk[i].text}`);
-        cache[key] = translated;
-        translations[chunk[i].id] = translated;
+        cache[hashKey(chunk[i].text)] = translated;
+        for (const id of chunk[i].ids) translations[id] = translated;
         added++;
       }
     }
   }
 
-  if (added > 0) {
+  if (added > 0 || newlyAliased) {
     const pruned = pruneCache(cache);
     await bucket.put(CACHE_KEY, JSON.stringify(pruned), {
       httpMetadata: { contentType: "application/json; charset=utf-8" },
@@ -107,10 +126,10 @@ export async function onRequestPost({ request, env }) {
   const body = { translations };
   if (payload && payload.debug === true) {
     body.debug = {
+      uniqueTexts: groups.size,
       pending: pending.length,
       added,
       neurons: Number(neurons.toFixed(4)),
-      requested: cleaned.length,
       hasAI: Boolean(env.AI),
       error: firstError
     };
@@ -123,12 +142,11 @@ export async function onRequestPost({ request, env }) {
 async function translateChunk(env, chunk) {
   const texts = chunk.map(item => item.text);
   const system = [
-    `You are a precise translation engine for news headlines.`,
-    `Translate each input string to ${TARGET_NAME}.`,
-    `Keep it concise, like a headline. Preserve names, places, and meaning.`,
-    `Do not add commentary, quotes, or explanations.`,
-    `If a string is already in ${TARGET_NAME}, return it unchanged.`,
-    `Respond with ONLY a JSON array of strings, same length and order as the input.`
+    `Translate each headline to ${TARGET_NAME}.`,
+    `Keep it concise; preserve names and meaning.`,
+    `No commentary or quotes.`,
+    `If already ${TARGET_NAME}, return it unchanged.`,
+    `Output ONLY a JSON array of strings, same length and order as the input.`
   ].join(" ");
 
   try {
@@ -174,6 +192,10 @@ function extractJsonArray(text) {
   } catch {
     return null;
   }
+}
+
+function normalizeText(value) {
+  return String(value).replace(/\s+/g, " ").trim();
 }
 
 function pruneCache(cache) {

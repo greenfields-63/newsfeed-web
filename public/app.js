@@ -584,6 +584,7 @@ function normalizeFeedDates(items) {
 // TRANSLATION ENGINE (Cloudflare Workers AI via /api/translate, cached in localStorage)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
 const SERVER_TRANSLATION_TARGET = 'en';
+let translationFetchInFlight = false;
 
 function saveTranslationCache() {
   try {
@@ -594,7 +595,8 @@ function saveTranslationCache() {
 }
 
 function translationCacheKey(item, targetLanguage) {
-  return `${item.language}_${targetLanguage}_${item.originalTitle}`;
+  const normalized = String(item.originalTitle || '').replace(/\s+/g, ' ').trim();
+  return `${targetLanguage}_${normalized}`;
 }
 
 async function translateItemsForLanguage(items, targetLanguage) {
@@ -615,7 +617,8 @@ async function translateItemsForLanguage(items, targetLanguage) {
     pending.push(item);
   }
 
-  if (pending.length) {
+  if (pending.length && !translationFetchInFlight) {
+    translationFetchInFlight = true;
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
@@ -644,6 +647,8 @@ async function translateItemsForLanguage(items, targetLanguage) {
       }
     } catch (e) {
       console.warn('Translation request failed:', e.message);
+    } finally {
+      translationFetchInFlight = false;
     }
   }
 
