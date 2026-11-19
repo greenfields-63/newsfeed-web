@@ -171,6 +171,19 @@
       <div id="signals-list" class="max-h-40 space-y-2 overflow-y-auto overscroll-contain pr-1 custom-scrollbar sm:max-h-64"></div>
     </section>
 
+    <!-- Regional AI Briefing -->
+    <section id="summary-section" class="hidden mb-4 rounded-2xl border border-sky-500/25 bg-slate-900/70 p-3 sm:p-4 shadow-lg">
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
+        <div>
+          <h2 class="text-base font-extrabold tracking-tight text-sky-300">Regional Briefing</h2>
+          <p class="hidden sm:block mt-1 text-xs text-slate-400">AI summary of recent headlines by region · refreshes 3× daily</p>
+        </div>
+        <span id="summary-updated" class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200"></span>
+      </div>
+      <div id="summary-regions" class="space-y-2"></div>
+      <p id="summary-status" class="text-xs text-slate-400"></p>
+    </section>
+
     <!-- Status / Loading Indicator -->
     <div id="loading-state" class="flex flex-col items-center justify-center py-20 text-center">
       <div class="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>

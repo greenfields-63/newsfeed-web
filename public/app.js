@@ -63,6 +63,7 @@ let headlineLanguage = Object.hasOwn(headlineLanguageOptions, savedHeadlineLangu
 let headlineTranslationRequest = 0;
 let selectedFilterId = null;
 let selectedFilterCountry = null;
+let selectedFilterRegion = null;
 let isRefreshing = false;
 let newsRefreshTimeout = null;
 let lastSnapshotGeneratedAt = localStorage.getItem('newsfeed_last_snapshot_generated_at');
@@ -72,6 +73,10 @@ let deferredInstallPrompt = null;
 const loadingState = document.getElementById('loading-state');
 const headlinesGrid = document.getElementById('headlines-grid');
 const emptyState = document.getElementById('empty-state');
+const summarySection = document.getElementById('summary-section');
+const summaryRegions = document.getElementById('summary-regions');
+const summaryStatus = document.getElementById('summary-status');
+const summaryUpdated = document.getElementById('summary-updated');
 const filterBar = document.getElementById('filter-bar');
 const lastUpdatedText = document.getElementById('last-updated-text');
 const btnRefresh = document.getElementById('btn-refresh');
@@ -100,9 +105,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (translateToEnglishToggle) translateToEnglishToggle.checked = headlineLanguage === 'en';
   await loadSourcesFromGist();
   renderFilterBar();
+  void loadSummary();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       refreshNews();
+      void loadSummary();
     }
   });
   if (cachedHeadlines.length > 0) {
@@ -650,6 +657,9 @@ function renderHeadlines() {
   let itemsToDisplay = cachedHeadlines;
   if (selectedFilterId) {
     itemsToDisplay = cachedHeadlines.filter(item => item.sourceId === selectedFilterId);
+  } else if (selectedFilterRegion) {
+    const regionSourceIds = new Set(REGION_SOURCES[selectedFilterRegion] || []);
+    itemsToDisplay = cachedHeadlines.filter(item => regionSourceIds.has(item.sourceId));
   } else if (selectedFilterCountry) {
     const countrySourceIds = new Set(
       ALL_SOURCES.filter(source => source.country === selectedFilterCountry).map(source => source.id)
@@ -801,21 +811,126 @@ function openArticle(item) {
     });
 }
 
+// REGIONAL AI BRIEFING
+const REGION_SOURCES = {
+  'Middle East': ['israel_hayom', 'inn', 'jpost', 'times_of_israel', 'ynet', 'al_arabiya', 'al_akhbar', 'an_nahar'],
+  'Europe': ['bbc', 'sky', 'france24', 'rtve'],
+  'Russia & CIS': ['ria', 'tass'],
+  'Asia': ['caixin', 'scmp', 'xinhua', 'the_paper', 'nhk', 'amar_ujala'],
+  'Asia-Pacific': ['abc_australia', 'sbs'],
+  'North America': ['abc', 'ap', 'bloomberg', 'cbs', 'cnn', 'fox', 'nbc'],
+  'Latin America': ['infobae'],
+  'Global': ['reuters', 'mercopress']
+};
+
+async function loadSummary() {
+  if (!summarySection) return;
+  try {
+    const res = await fetch('/api/summary', { cache: 'no-store' });
+    if (!res.ok) {
+      if (summaryStatus) summaryStatus.textContent = 'Regional briefing is unavailable right now.';
+      return;
+    }
+    const data = await res.json();
+    renderSummary(data);
+  } catch (error) {
+    console.warn('Could not load regional briefing:', error.message);
+    if (summaryStatus) summaryStatus.textContent = 'Could not load the regional briefing.';
+  }
+}
+
+function renderSummary(data) {
+  const regions = Array.isArray(data?.regions) ? data.regions : [];
+  if (!regions.length) {
+    summarySection.classList.add('hidden');
+    return;
+  }
+  summarySection.classList.remove('hidden');
+  summaryRegions.innerHTML = '';
+  if (summaryStatus) summaryStatus.textContent = '';
+  if (summaryUpdated) {
+    summaryUpdated.textContent = data.generatedAt
+      ? new Date(data.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+  }
+
+  regions.forEach((entry, index) => {
+    if (!entry || typeof entry.region !== 'string') return;
+    const details = document.createElement('details');
+    details.className = 'group rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2';
+    if (index === 0) details.open = true;
+
+    const head = document.createElement('summary');
+    head.className = 'flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-100';
+    const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
+    head.innerHTML = `<span class="text-sky-300">${escapeHtml(entry.region)}</span><span class="text-xs font-normal text-slate-400">${bullets.length + (entry.lead ? 1 : 0)} points</span>`;
+    details.appendChild(head);
+
+    const body = document.createElement('div');
+    body.className = 'mt-2 space-y-2';
+    if (entry.lead) {
+      const lead = document.createElement('p');
+      lead.className = 'text-sm leading-relaxed text-slate-200';
+      lead.textContent = entry.lead;
+      body.appendChild(lead);
+    }
+    if (bullets.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'list-disc space-y-1 pl-5 text-sm text-slate-300';
+      bullets.forEach(bullet => {
+        const li = document.createElement('li');
+        li.textContent = bullet;
+        ul.appendChild(li);
+      });
+      body.appendChild(ul);
+    }
+    const showBtn = document.createElement('button');
+    showBtn.type = 'button';
+    showBtn.className = 'inline-flex items-center gap-1 text-xs font-semibold text-sky-400 hover:text-sky-300';
+    showBtn.textContent = selectedFilterRegion === entry.region ? 'Clear region filter ✕' : 'Show in feed →';
+    showBtn.addEventListener('click', event => {
+      event.preventDefault();
+      selectedFilterRegion = selectedFilterRegion === entry.region ? null : entry.region;
+      selectedFilterId = null;
+      selectedFilterCountry = null;
+      renderFilterBar();
+      renderHeadlines();
+      document.getElementById('news-feed')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    body.appendChild(showBtn);
+    details.appendChild(body);
+    summaryRegions.appendChild(details);
+  });
+}
+
 // RENDER FILTER BAR (Grouped by region/country with headers and vertical bar separators)
 function renderFilterBar() {
   const activeSources = ALL_SOURCES.filter(s => enabledSourceIds.has(s.id));
   filterBar.innerHTML = '';
 
   const allBtn = document.createElement('button');
-  allBtn.className = `px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${selectedFilterId === null ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'}`;
+  allBtn.className = `px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${selectedFilterId === null && selectedFilterRegion === null ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'}`;
   allBtn.textContent = `All (${activeSources.length})`;
   allBtn.onclick = () => {
     selectedFilterId = null;
     selectedFilterCountry = null;
+    selectedFilterRegion = null;
     renderFilterBar();
     renderHeadlines();
   };
   filterBar.appendChild(allBtn);
+
+  if (selectedFilterRegion) {
+    const regionChip = document.createElement('button');
+    regionChip.className = 'px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap bg-sky-600 text-white shadow-md';
+    regionChip.textContent = `${selectedFilterRegion} ✕`;
+    regionChip.onclick = () => {
+      selectedFilterRegion = null;
+      renderFilterBar();
+      renderHeadlines();
+    };
+    filterBar.appendChild(regionChip);
+  }
 
   if (activeSources.length === 0) return;
 
@@ -843,6 +958,7 @@ function renderFilterBar() {
     countryBtn.onclick = () => {
       selectedFilterCountry = isCountrySelected ? null : country;
       selectedFilterId = null;
+      selectedFilterRegion = null;
       renderFilterBar();
       renderHeadlines();
     };
@@ -859,6 +975,7 @@ function renderFilterBar() {
       btn.onclick = () => {
         selectedFilterId = isSelected ? null : source.id;
         selectedFilterCountry = null;
+        selectedFilterRegion = null;
         renderFilterBar();
         renderHeadlines();
       };
