@@ -61,7 +61,7 @@ const AN_NAHAR_SOURCE = {
 const CNBC_SOURCE = {
   id: "cnbc",
   name: "CNBC",
-  feedUrl: "https://search.cnbc.com/rs/search/combinednavbarpage.xml?partnerId=2000&id=100003114",
+  feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Acnbc.com&hl=en-US&gl=US&ceid=US%3Aen",
   language: "en",
   color: "#0082C8",
   country: "United States"
@@ -83,7 +83,7 @@ const FEED_URL_OVERRIDES = {
   abc: "https://abcnews.com/abcnews/topstories",
   bloomberg: "https://www.bloomberg.com/feeds/politics/news.rss",
   caixin: "https://news.google.com/rss/search?q=when%3A24h%20site%3Acaixinglobal.com&hl=en-US&gl=US&ceid=US%3Aen",
-  cnbc: "https://search.cnbc.com/rs/search/combinednavbarpage.xml?partnerId=2000&id=100003114",
+  cnbc: "https://news.google.com/rss/search?q=when%3A3h%20site%3Acnbc.com&hl=en-US&gl=US&ceid=US%3Aen",
   nhk: "https://news.google.com/rss/search?q=when%3A24h%20site%3Anhk.or.jp&hl=ja&gl=JP&ceid=JP%3Aja",
   sbs: "https://news.google.com/rss/search?q=when%3A24h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen",
   tass: TASS_FEED_URL

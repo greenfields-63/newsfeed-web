@@ -32,7 +32,7 @@ const DEFAULT_SOURCES = [
   { id: "ap", name: "Associated Press", feedUrl: "https://news.google.com/rss/search?q=when%3A24h%20source%3AAssociated%20Press&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#5D4037", country: "United States" },
   { id: "bloomberg", name: "Bloomberg", feedUrl: "https://feeds.bloomberg.com/politics/news.rss", language: "en", color: "#E65100", country: "United States" },
   { id: "cbs", name: "CBS News", feedUrl: "https://www.cbsnews.com/latest/rss/main", language: "en", color: "#388E3C", country: "United States" },
-  { id: "cnbc", name: "CNBC", feedUrl: "https://search.cnbc.com/rs/search/combinednavbarpage.xml?partnerId=2000&id=100003114", language: "en", color: "#0082C8", country: "United States" },
+  { id: "cnbc", name: "CNBC", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Acnbc.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#0082C8", country: "United States" },
   { id: "cnn", name: "CNN", feedUrl: "https://news.google.com/rss/search?q=when%3A3h%20site%3Acnn.com&hl=en-US&gl=US&ceid=US%3Aen", language: "en", color: "#B71C1C", country: "United States" },
   { id: "fox", name: "Fox News", feedUrl: "https://moxie.foxnews.com/google-publisher/latest.xml", language: "en", color: "#0D47A1", country: "United States" },
   { id: "amar_ujala", name: "Amar Ujala", feedUrl: "https://www.amarujala.com/rss/india-news.xml", language: "hi", color: "#FF9933", country: "India" },
