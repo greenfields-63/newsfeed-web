@@ -42,6 +42,7 @@ const REGION_OF_SOURCE = {
   ap: "North America",
   bloomberg: "North America",
   cbs: "North America",
+  cnbc: "North America",
   cnn: "North America",
   fox: "North America",
   nbc: "North America",

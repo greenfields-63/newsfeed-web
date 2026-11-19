@@ -10,6 +10,8 @@ const TASS_SNAPSHOT_FEED_URL =
 
 // Required by the current Gist source list; all snapshot URLs still pass through the allowlist.
 ALLOWED_RSS_HOSTS.add("feeds.nbcnews.com");
+ALLOWED_RSS_HOSTS.add("search.cnbc.com");
+ALLOWED_RSS_HOSTS.add("www.cnbc.com");
 
 let latestNewsSnapshot = null;
 let newsSnapshotRefreshPromise = null;

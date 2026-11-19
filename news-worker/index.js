@@ -74,6 +74,7 @@ const FEED_URL_OVERRIDES = {
   abc: "https://abcnews.com/abcnews/topstories",
   bloomberg: "https://www.bloomberg.com/feeds/politics/news.rss",
   caixin: "https://news.google.com/rss/search?q=when%3A24h%20site%3Acaixinglobal.com&hl=en-US&gl=US&ceid=US%3Aen",
+  cnbc: "https://search.cnbc.com/rs/search/combinednavbarpage.xml?partnerId=2000&id=100003114",
   nhk: "https://news.google.com/rss/search?q=when%3A24h%20site%3Anhk.or.jp&hl=ja&gl=JP&ceid=JP%3Aja",
   sbs: "https://news.google.com/rss/search?q=when%3A24h%20site%3Asbs.com.au%2Fnews&hl=en-AU&gl=AU&ceid=AU%3Aen",
   tass: TASS_FEED_URL
@@ -98,6 +99,8 @@ const ALLOWED_HOSTS = new Set([
   "www.cbsnews.com",
   "moxie.foxnews.com",
   "feeds.nbcnews.com",
+  "search.cnbc.com",
+  "www.cnbc.com",
   "www.cnn.com",
   "www.france24.com",
   "www.amarujala.com"

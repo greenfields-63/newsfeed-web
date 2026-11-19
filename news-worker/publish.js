@@ -37,6 +37,7 @@ const SOURCE_METADATA = [
   { id: "ap", name: "Associated Press", country: "United States" },
   { id: "bloomberg", name: "Bloomberg", country: "United States" },
   { id: "cbs", name: "CBS News", country: "United States" },
+  { id: "cnbc", name: "CNBC", country: "United States" },
   { id: "cnn", name: "CNN", country: "United States" },
   { id: "fox", name: "Fox News", country: "United States" },
   { id: "amar_ujala", name: "Amar Ujala", country: "India" },
