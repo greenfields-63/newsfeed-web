@@ -121,10 +121,10 @@ export async function onRequestGet(context) {
 function getSlotInfo(now = new Date()) {
   const hour = now.getUTCHours();
   let slotHour;
-  if (hour < 6) slotHour = 18;
-  else if (hour < 12) slotHour = 6;
-  else if (hour < 18) slotHour = 12;
-  else slotHour = 18;
+  if (hour < 5) slotHour = 21;
+  else if (hour < 13) slotHour = 5;
+  else if (hour < 21) slotHour = 13;
+  else slotHour = 21;
 
   const start = new Date(Date.UTC(
     now.getUTCFullYear(),
@@ -132,9 +132,9 @@ function getSlotInfo(now = new Date()) {
     now.getUTCDate(),
     slotHour
   ));
-  if (hour < 6) start.setUTCDate(start.getUTCDate() - 1);
+  if (hour < 5) start.setUTCDate(start.getUTCDate() - 1);
 
-  const name = slotHour === 6 ? "Morning" : slotHour === 12 ? "Afternoon" : "Evening";
+  const name = slotHour === 5 ? "Morning" : slotHour === 13 ? "Afternoon" : "Evening";
 
   return { key: start.toISOString().slice(0, 13), start, name };
 }
