@@ -47,12 +47,31 @@ const SOURCE_METADATA = [
 export default {
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(publishSnapshot(env, controller.scheduledTime));
+    ctx.waitUntil(warmSlotSummary());
   },
 
   async fetch() {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 };
+
+const SUMMARY_ENDPOINT = "https://newsfeed-web-2jw.pages.dev/api/summary";
+
+async function warmSlotSummary() {
+  try {
+    const response = await fetch(SUMMARY_ENDPOINT, { headers: { "cache-control": "no-cache" } });
+    if (!response.ok) {
+      console.log(`[SUMMARY] warm failed: HTTP ${response.status}`);
+      return;
+    }
+    const data = await response.json();
+    console.log(
+      `[SUMMARY] slot=${data.slotKey || "?"} cached=${Boolean(data.cached)} regions=${(data.regions || []).length}`
+    );
+  } catch (error) {
+    console.log(`[SUMMARY] warm failed: ${error.message}`);
+  }
+}
 
 async function publishSnapshot(env, scheduledTime) {
   const bucket = env.NEWS_SNAPSHOT_BUCKET;
