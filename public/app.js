@@ -436,17 +436,17 @@ async function refreshNews() {
       return parseXmlFeed(feed.xml, source);
     });
 
-    let translationRequestId = ++headlineTranslationRequest;
-    let translationLanguage = headlineLanguage;
-    let translatedItems = await translateItemsForLanguage(allItems, translationLanguage);
-    while (translationLanguage !== headlineLanguage || translationRequestId !== headlineTranslationRequest) {
-      translationRequestId = ++headlineTranslationRequest;
-      translationLanguage = headlineLanguage;
-      translatedItems = await translateItemsForLanguage(allItems, translationLanguage);
-    }
-
-    cachedHeadlines = filterRecentHeadlines(translatedItems);
+    cachedHeadlines = filterRecentHeadlines(allItems);
     saveHeadlines();
+
+    translateItemsForLanguage(cachedHeadlines, headlineLanguage)
+      .then(updated => {
+        if (updated && updated.length) {
+          cachedHeadlines = filterRecentHeadlines(updated);
+          saveHeadlines();
+          renderHeadlines();
+        }
+      });
 
     const snapshotDate = new Date(snapshot.generatedAt);
     const updatedAt = Number.isNaN(snapshotDate.getTime())
