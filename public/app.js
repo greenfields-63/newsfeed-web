@@ -620,23 +620,39 @@ async function translateItemsForLanguage(items, targetLanguage) {
   if (pending.length && !translationFetchInFlight) {
     translationFetchInFlight = true;
     try {
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let changed = false;
+      const CHUNK = 40;
+      for (let i = 0; i < pending.length; i += CHUNK) {
+        const chunk = pending.slice(i, i + CHUNK);
+        const payload = JSON.stringify({
           target: SERVER_TRANSLATION_TARGET,
-          items: pending.map(item => ({
+          items: chunk.map(item => ({
             id: item.id,
             text: item.originalTitle,
             lang: item.language || 'auto'
           }))
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const translations = data && data.translations ? data.translations : {};
-        let changed = false;
-        for (const item of pending) {
+        });
+        let data = null;
+        for (let attempt = 0; attempt < 3 && !data; attempt++) {
+          if (attempt) await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 4000 : 10000));
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 45000);
+            const res = await fetch('/api/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+              signal: controller.signal
+            });
+            clearTimeout(timer);
+            if (res.ok) data = await res.json();
+          } catch (e) {
+            console.warn(`Translation attempt ${attempt + 1} failed:`, e.message);
+          }
+        }
+        if (!data) continue;
+        const translations = data.translations ? data.translations : {};
+        for (const item of chunk) {
           const translated = translations[item.id];
           if (typeof translated === 'string' && translated.trim()) {
             translationCache[translationCacheKey(item, targetLanguage)] = cleanText(translated);
@@ -645,8 +661,6 @@ async function translateItemsForLanguage(items, targetLanguage) {
         }
         if (changed) saveTranslationCache();
       }
-    } catch (e) {
-      console.warn('Translation request failed:', e.message);
     } finally {
       translationFetchInFlight = false;
     }
