@@ -59,7 +59,7 @@ export async function onRequestGet(context) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/v6/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v7/${slot.key}.json`;
 
   try {
     const cachedObject = await bucket.get(cacheKey);
@@ -222,7 +222,8 @@ async function summarizeRegion(env, region, titles) {
     `Write a short English briefing for the "${region}" region from the headlines provided.`,
     "Use ONLY the information written in the headlines. Do not add titles, honorifics, roles, party affiliations, first names, or background facts that are not explicitly stated in a headline.",
     "Refer to each person and place exactly as the headlines name them (e.g. if a headline says 'Trump', write 'Trump' with no added title or descriptor).",
-    "Keep it neutral and factual. Do not invent or infer details. Translate non-English headlines into English as needed.",
+    "Keep it neutral and factual. Do not invent or infer details.",
+    "Write the entire briefing in English. Translate every name, organization, quote, and phrase into English; never output Arabic, Hebrew, Cyrillic, Chinese, Japanese, Korean, or any other non-Latin script.",
     "Respond in EXACTLY this plain-text format, with nothing before or after it:",
     "LEAD: <one or two sentence overview>",
     "- <bullet 1>",
@@ -249,6 +250,10 @@ async function summarizeRegion(env, region, titles) {
       });
       const parsed = parseSummaryText(extractResponseText(result));
       if (parsed) {
+        if (hasNonLatinText(parsed) && attempt < 2) {
+          console.warn(`Summary for ${region} attempt ${attempt + 1} contained non-Latin text; retrying`);
+          continue;
+        }
         return {
           region,
           lead: parsed.lead || parsed.bullets[0] || "",
@@ -262,6 +267,13 @@ async function summarizeRegion(env, region, titles) {
     }
   }
   return null;
+}
+
+const NON_LATIN_PATTERN = /[\u0370-\u03FF\u0400-\u052F\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u0900-\u097F\u0E00-\u0E7F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]/;
+
+function hasNonLatinText(parsed) {
+  const text = [parsed.lead, ...(parsed.bullets || [])].join(" ");
+  return NON_LATIN_PATTERN.test(text);
 }
 
 function parseSummaryText(text) {
