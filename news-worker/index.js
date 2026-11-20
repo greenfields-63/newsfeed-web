@@ -255,6 +255,12 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   });
   console.log(`[PERF] [${group}] R2 write: ${Date.now() - r2WriteStart}ms`);
 
+  try {
+    await warmTranslations(env, results, sourcesToFetch);
+  } catch (error) {
+    console.log(`[WARMUP] [${group}] failed: ${error.message}`);
+  }
+
   console.log(
     `[PERF] [${group}] TOTAL execution time: ${Date.now() - totalStartTime}ms | Success: ${results.filter(result => result.xml).length}/${sourcesToFetch.length}`
   );
@@ -481,4 +487,79 @@ async function mapWithLimit(items, limit, callback) {
     })
   );
   return results;
+}
+
+const TRANSLATE_ENDPOINT = "https://newsfeed-web-2jw.pages.dev/api/translate";
+const WARMUP_LIMIT = 200;
+const WARMUP_CHUNK = 40;
+
+async function warmTranslations(env, results, sources) {
+  const languageOf = new Map(
+    sources.map(source => [source.id, (source.language || "").toLowerCase().split("-")[0]])
+  );
+  const seen = new Set();
+  const items = [];
+
+  for (const result of results) {
+    if (!result?.xml) continue;
+    const lang = languageOf.get(result.id);
+    if (!lang || lang === "en") continue;
+    for (const raw of extractFeedTitles(result.xml)) {
+      const text = raw.replace(/\s+/g, " ").trim();
+      if (text.length < 3) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ id: `w${items.length}`, text, lang });
+      if (items.length >= WARMUP_LIMIT) break;
+    }
+    if (items.length >= WARMUP_LIMIT) break;
+  }
+
+  if (!items.length) return;
+
+  const endpoint = env.TRANSLATE_URL || TRANSLATE_ENDPOINT;
+  const chunks = [];
+  for (let i = 0; i < items.length; i += WARMUP_CHUNK) {
+    chunks.push(items.slice(i, i + WARMUP_CHUNK));
+  }
+
+  let submitted = 0;
+  await mapWithLimit(chunks, 3, async chunk => {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target: "en", items: chunk })
+      });
+      if (response.ok) submitted += chunk.length;
+    } catch (error) {
+      console.log(`[WARMUP] chunk failed: ${error.message}`);
+    }
+  });
+
+  console.log(`[WARMUP] submitted ${submitted}/${items.length} non-English headlines`);
+}
+
+function extractFeedTitles(xml) {
+  const titles = [];
+  const blocks = xml.match(/<(item|entry)\b[\s\S]*?<\/\1>/gi) || [];
+  for (const block of blocks) {
+    const match = block.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
+    if (match) titles.push(decodeXmlText(match[1]));
+  }
+  return titles;
+}
+
+function decodeXmlText(value) {
+  return value
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
 }
