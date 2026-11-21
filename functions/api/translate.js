@@ -5,6 +5,7 @@ const MAX_BATCH = 40;
 const MAX_ITEMS = 300;
 const MAX_CACHE_ENTRIES = 30000;
 const TARGET_NAME = "English";
+const IN_FLIGHT_TRANSLATIONS = new Map();
 
 export async function onRequestGet({ env }) {
   if (!env.NEWS_SNAPSHOT_BUCKET) {
@@ -97,7 +98,18 @@ export async function onRequestPost({ request, env }) {
     for (let i = 0; i < pending.length; i += MAX_BATCH) {
       chunks.push(pending.slice(i, i + MAX_BATCH));
     }
-    const results = await mapWithLimit(chunks, 3, chunk => translateChunk(env, chunk));
+    const results = await mapWithLimit(chunks, 3, async (chunk) => {
+      const key = chunk.map(item => item.text).sort().join("\n");
+      const inFlight = IN_FLIGHT_TRANSLATIONS.get(key);
+      if (inFlight) return inFlight;
+      const promise = translateChunk(env, chunk);
+      IN_FLIGHT_TRANSLATIONS.set(key, promise);
+      try {
+        return await promise;
+      } finally {
+        IN_FLIGHT_TRANSLATIONS.delete(key);
+      }
+    });
     for (let c = 0; c < chunks.length; c++) {
       const chunk = chunks[c];
       const res = results[c];

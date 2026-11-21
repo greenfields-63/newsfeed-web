@@ -258,7 +258,7 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   try {
     await warmTranslations(env, results, sourcesToFetch);
   } catch (error) {
-    console.log(`[WARMUP] [${group}] failed: ${error.message}`);
+    console.error(`[WARMUP] [${group}] failed: ${error.message}`);
   }
 
   console.log(
@@ -490,8 +490,8 @@ async function mapWithLimit(items, limit, callback) {
 }
 
 const TRANSLATE_ENDPOINT = "https://newsfeed-web-2jw.pages.dev/api/translate";
-const WARMUP_LIMIT = 200;
 const WARMUP_CHUNK = 40;
+const WARMUP_MAX_RETRIES = 3;
 
 async function warmTranslations(env, results, sources) {
   const languageOf = new Map(
@@ -511,12 +511,13 @@ async function warmTranslations(env, results, sources) {
       if (seen.has(key)) continue;
       seen.add(key);
       items.push({ id: `w${items.length}`, text, lang });
-      if (items.length >= WARMUP_LIMIT) break;
     }
-    if (items.length >= WARMUP_LIMIT) break;
   }
 
-  if (!items.length) return;
+  if (!items.length) {
+    console.log("[WARMUP] no non-English headlines to translate");
+    return;
+  }
 
   const endpoint = env.TRANSLATE_URL || TRANSLATE_ENDPOINT;
   const chunks = [];
@@ -525,20 +526,38 @@ async function warmTranslations(env, results, sources) {
   }
 
   let submitted = 0;
-  await mapWithLimit(chunks, 3, async chunk => {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ target: "en", items: chunk })
-      });
-      if (response.ok) submitted += chunk.length;
-    } catch (error) {
-      console.log(`[WARMUP] chunk failed: ${error.message}`);
+  const failedChunks = [];
+
+  await mapWithLimit(chunks, 3, async (chunk, index) => {
+    let lastError = null;
+    for (let attempt = 0; attempt < WARMUP_MAX_RETRIES; attempt++) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ target: "en", items: chunk })
+        });
+        if (response.ok) {
+          submitted += chunk.length;
+          return;
+        }
+        lastError = new Error(`HTTP ${response.status}`);
+      } catch (error) {
+        lastError = error;
+      }
+      if (attempt < WARMUP_MAX_RETRIES - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
     }
+    failedChunks.push({ index, error: lastError?.message ?? "unknown error" });
   });
 
-  console.log(`[WARMUP] submitted ${submitted}/${items.length} non-English headlines`);
+  console.log(
+    `[WARMUP] submitted ${submitted}/${items.length} non-English headlines, ${failedChunks.length} chunk(s) failed`
+  );
+  for (const failure of failedChunks) {
+    console.error(`[WARMUP] chunk ${failure.index} failed: ${failure.error}`);
+  }
 }
 
 function extractFeedTitles(xml) {
