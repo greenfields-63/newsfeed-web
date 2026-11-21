@@ -470,12 +470,14 @@ async function refreshNews() {
 
 function filterRecentHeadlines(items) {
   const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
+  const now = Date.now();
   const seenIds = new Set();
   return items
     .filter(item => {
       if (seenIds.has(item.id)) return false;
       seenIds.add(item.id);
-      return item.pubDate >= threeHoursAgo;
+      if (item.pubDate == null) return false;
+      return item.pubDate >= threeHoursAgo && item.pubDate <= now + 10 * 60 * 1000;
     })
     .sort((a, b) => b.pubDate - a.pubDate)
     .slice(0, 250);
@@ -1100,16 +1102,16 @@ function formatTimestamp(timestamp) {
 
 // HELPERS
 function parseDate(dateStr) {
-  if (!dateStr) return Date.now();
+  if (!dateStr) return null;
   const cleaned = dateStr.replace(/<!\[CDATA\[/gi, '').replace(/\]\]>/gi, '').trim();
   let parsed = Date.parse(cleaned);
-  if (isNaN(parsed)) return Date.now();
+  if (isNaN(parsed)) return null;
 
-  // Clamp future dates (server timestamp bugs like year 2026) to current time
+  // Reject dates more than 10 minutes in the future (clock skew tolerance).
+  // Do not clamp to now — that makes stale/future-dated headlines appear as "Just now" forever.
   const now = Date.now();
-  if (parsed > now) {
-    parsed = now;
-  }
+  if (parsed > now + 10 * 60 * 1000) return null;
+  if (parsed > now) return now;
   return parsed;
 }
 
