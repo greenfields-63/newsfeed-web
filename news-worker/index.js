@@ -245,6 +245,12 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
   }
 
   const snapshot = { generatedAt, feeds, errors };
+  try {
+    await warmTranslations(env, results, sourcesToFetch);
+  } catch (error) {
+    console.error(`[WARMUP] [${group}] failed: ${error.message}`);
+  }
+
   const r2WriteStart = Date.now();
   await env.NEWS_SNAPSHOT_BUCKET.put(snapshotKey, JSON.stringify(snapshot), {
     httpMetadata: {
@@ -254,12 +260,6 @@ async function refreshSnapshot(env, scheduledTime = Date.now()) {
     customMetadata: { generatedAt }
   });
   console.log(`[PERF] [${group}] R2 write: ${Date.now() - r2WriteStart}ms`);
-
-  try {
-    await warmTranslations(env, results, sourcesToFetch);
-  } catch (error) {
-    console.error(`[WARMUP] [${group}] failed: ${error.message}`);
-  }
 
   console.log(
     `[PERF] [${group}] TOTAL execution time: ${Date.now() - totalStartTime}ms | Success: ${results.filter(result => result.xml).length}/${sourcesToFetch.length}`
