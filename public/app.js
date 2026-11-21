@@ -621,10 +621,13 @@ async function translateItemsForLanguage(items, targetLanguage) {
   if (pending.length && !translationFetchInFlight) {
     translationFetchInFlight = true;
     try {
-      let changed = false;
       const CHUNK = 40;
+      const chunks = [];
       for (let i = 0; i < pending.length; i += CHUNK) {
-        const chunk = pending.slice(i, i + CHUNK);
+        chunks.push(pending.slice(i, i + CHUNK));
+      }
+
+      const results = await Promise.all(chunks.map(async (chunk) => {
         const payload = JSON.stringify({
           target: SERVER_TRANSLATION_TARGET,
           items: chunk.map(item => ({
@@ -651,6 +654,11 @@ async function translateItemsForLanguage(items, targetLanguage) {
             console.warn(`Translation attempt ${attempt + 1} failed:`, e.message);
           }
         }
+        return { chunk, data };
+      }));
+
+      let changed = false;
+      for (const { chunk, data } of results) {
         if (!data) continue;
         const translations = data.translations ? data.translations : {};
         for (const item of chunk) {
@@ -660,8 +668,8 @@ async function translateItemsForLanguage(items, targetLanguage) {
             changed = true;
           }
         }
-        if (changed) saveTranslationCache();
       }
+      if (changed) saveTranslationCache();
     } finally {
       translationFetchInFlight = false;
     }
