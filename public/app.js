@@ -439,14 +439,13 @@ async function refreshNews() {
     cachedHeadlines = filterRecentHeadlines(allItems);
     saveHeadlines();
 
-    translateItemsForLanguage(cachedHeadlines, headlineLanguage)
-      .then(updated => {
-        if (updated && updated.length) {
-          cachedHeadlines = filterRecentHeadlines(updated);
-          saveHeadlines();
-          renderHeadlines();
-        }
-      });
+    if (headlineLanguage === 'en') {
+      const updated = await translateItemsForLanguage(cachedHeadlines, headlineLanguage);
+      if (updated && updated.length) {
+        cachedHeadlines = filterRecentHeadlines(updated);
+        saveHeadlines();
+      }
+    }
 
     const snapshotDate = new Date(snapshot.generatedAt);
     const updatedAt = Number.isNaN(snapshotDate.getTime())
