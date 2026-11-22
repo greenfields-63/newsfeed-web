@@ -114,6 +114,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   if (cachedHeadlines.length > 0) {
+    if (headlineLanguage === 'en') {
+      cachedHeadlines = cachedHeadlines.map(item => applyTranslationToItem(item, 'en'));
+    }
     renderHeadlines();
   }
   refreshNews();
@@ -365,6 +368,11 @@ translateToEnglishToggle?.addEventListener('change', () => {
     return;
   }
 
+  // Synchronously apply existing cached translations immediately
+  cachedHeadlines = cachedHeadlines.map(item => applyTranslationToItem(item, 'en'));
+  saveHeadlines();
+  renderHeadlines();
+
   const originalHeadlines = cachedHeadlines.map(item => ({
     ...item,
     displayTitle: item.originalTitle,
@@ -438,16 +446,17 @@ async function refreshNews() {
       return parseXmlFeed(feed.xml, source);
     });
 
-    cachedHeadlines = filterRecentHeadlines(allItems);
-    saveHeadlines();
+    let freshHeadlines = filterRecentHeadlines(allItems);
 
     if (headlineLanguage === 'en') {
-      const updated = await translateItemsForLanguage(cachedHeadlines, headlineLanguage);
+      const updated = await translateItemsForLanguage(freshHeadlines, headlineLanguage);
       if (updated && updated.length) {
-        cachedHeadlines = filterRecentHeadlines(updated);
-        saveHeadlines();
+        freshHeadlines = updated;
       }
     }
+
+    cachedHeadlines = filterRecentHeadlines(freshHeadlines);
+    saveHeadlines();
 
     const snapshotDate = new Date(snapshot.generatedAt);
     const updatedAt = Number.isNaN(snapshotDate.getTime())
@@ -559,7 +568,7 @@ function parseXmlFeed(xmlText, source) {
 
     if (title) {
       const pubDate = parseDate(pubDateStr);
-      result.push({
+      const rawItem = {
         id: `${source.id}_${hashString(guid)}`,
         sourceId: source.id,
         sourceName: source.name,
@@ -570,7 +579,8 @@ function parseXmlFeed(xmlText, source) {
         link: link.trim(),
         pubDate: pubDate,
         isTranslated: false
-      });
+      };
+      result.push(applyTranslationToItem(rawItem));
     }
   });
 
@@ -621,6 +631,21 @@ function saveTranslationCache() {
 function translationCacheKey(item, targetLanguage) {
   const normalized = String(item.originalTitle || '').replace(/\s+/g, ' ').trim();
   return `${targetLanguage}_${normalized}`;
+}
+
+function applyTranslationToItem(item, targetLanguage = headlineLanguage) {
+  if (!item || !item.originalTitle) return item;
+  const sourceCode = (item.language || '').toLowerCase().split('-')[0];
+  const targetCode = (targetLanguage || '').toLowerCase().split('-')[0];
+  if (targetCode !== 'en' || sourceCode === 'en') {
+    return { ...item, displayTitle: item.originalTitle, isTranslated: false };
+  }
+  const key = translationCacheKey(item, targetLanguage);
+  const translated = translationCache[key];
+  if (translated && translated !== item.originalTitle) {
+    return { ...item, displayTitle: translated, isTranslated: true };
+  }
+  return { ...item, displayTitle: item.originalTitle, isTranslated: false };
 }
 
 async function translateItemsForLanguage(items, targetLanguage) {
