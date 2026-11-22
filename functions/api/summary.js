@@ -91,7 +91,7 @@ export async function onRequestGet(context) {
       return Response.json({ error: "No headlines available to summarize yet" }, { status: 503 });
     }
 
-    const results = await mapWithLimit(targets, 1, target => summarizeRegion(env, target.region, target.titles));
+    const results = await mapWithLimit(targets, 2, target => summarizeRegion(env, target.region, target.titles));
     const regions = results.filter(Boolean);
     const failedRegions = targets.filter((_, index) => !results[index]).map(target => target.region);
     if (!regions.length) {

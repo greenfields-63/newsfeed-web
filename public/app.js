@@ -167,7 +167,7 @@ function renderSignals(signals) {
           const summary = document.createElement('summary');
           summary.className = 'signal-summary flex cursor-pointer list-none items-start justify-between gap-3 text-sm font-medium leading-relaxed text-slate-100';
           const preview = document.createElement('span');
-          preview.className = 'signal-preview min-w-0 flex-1';
+          preview.className = 'signal-preview min-w-0 flex-1 group-open:hidden';
           const normalizedText = signal.text.replace(/\s+/g, ' ').trim();
           const firstSentence = normalizedText.match(/^.{1,140}?[.!?](?:\s|$)/)?.[0]?.trim();
           preview.textContent = firstSentence || (normalizedText.length > 140 ? `${normalizedText.slice(0, 137).trimEnd()}…` : normalizedText);
@@ -269,26 +269,27 @@ async function loadSourcesFromGist() {
         if (!Array.isArray(savedIds)) savedIds = [];
         if (savedIds.length > 0) {
           enabledSourceIds = new Set(savedIds);
+          let preferencesChanged = false;
           if (localStorage.getItem('newsfeed_the_paper_enabled_v1') !== 'true') {
             enabledSourceIds.add('the_paper');
-            savePreferences();
+            preferencesChanged = true;
             localStorage.setItem('newsfeed_the_paper_enabled_v1', 'true');
           }
           if (localStorage.getItem('newsfeed_rtve_enabled_v1') !== 'true') {
             enabledSourceIds.add('rtve');
-            savePreferences();
+            preferencesChanged = true;
             localStorage.setItem('newsfeed_rtve_enabled_v1', 'true');
           }
           if (localStorage.getItem('newsfeed_cnbc_enabled_v1') !== 'true') {
             enabledSourceIds.add('cnbc');
-            savePreferences();
+            preferencesChanged = true;
             localStorage.setItem('newsfeed_cnbc_enabled_v1', 'true');
           }
           for (const sourceId of ['abc_australia', 'sbs']) {
             const migrationKey = `newsfeed_${sourceId}_enabled_v1`;
             if (localStorage.getItem(migrationKey) !== 'true') {
               enabledSourceIds.add(sourceId);
-              savePreferences();
+              preferencesChanged = true;
               localStorage.setItem(migrationKey, 'true');
             }
           }
@@ -296,10 +297,11 @@ async function loadSourcesFromGist() {
             const migrationKey = `newsfeed_${sourceId}_enabled_v1`;
             if (localStorage.getItem(migrationKey) !== 'true') {
               enabledSourceIds.add(sourceId);
-              savePreferences();
+              preferencesChanged = true;
               localStorage.setItem(migrationKey, 'true');
             }
           }
+          if (preferencesChanged) savePreferences();
         } else {
           enabledSourceIds = new Set(ALL_SOURCES.map(s => s.id));
           savePreferences();
@@ -531,18 +533,26 @@ function parseXmlFeed(xmlText, source) {
 
   items.forEach(node => {
     const title = cleanText(node.querySelector('title')?.textContent || '');
-    let link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '';
+
+    let link = '';
+    const alternateLink = node.querySelector('link[rel="alternate"]')?.getAttribute('href');
+    if (alternateLink) {
+      link = alternateLink;
+    } else {
+      const firstLink = node.querySelector('link');
+      link = firstLink?.getAttribute('href') || firstLink?.textContent || '';
+    }
 
     let pubDateStr = '';
     for (const child of node.children) {
       const tag = child.tagName.toLowerCase();
-      if (tag === 'pubdate' || tag === 'published' || tag === 'dc:date') {
+      if (tag === 'pubdate' || tag === 'published' || tag === 'dc:date' || tag === 'updated') {
         pubDateStr = child.textContent;
         break;
       }
     }
     if (!pubDateStr) {
-      pubDateStr = node.querySelector('pubDate')?.textContent || '';
+      pubDateStr = node.querySelector('pubDate, published, updated')?.textContent || '';
     }
 
     const guid = node.querySelector('guid, id')?.textContent || link || title;
@@ -569,14 +579,17 @@ function parseXmlFeed(xmlText, source) {
 
 function normalizeFeedDates(items) {
   if (items.length === 0) return items;
+  const validDates = items.map(i => i.pubDate).filter(d => d != null && !isNaN(d));
+  if (validDates.length === 0) return items;
+
   const now = Date.now();
-  const maxDate = Math.max(...items.map(i => i.pubDate));
+  const maxDate = Math.max(...validDates);
 
   if (maxDate > now) {
     const skew = maxDate - now;
     return items.map(item => ({
       ...item,
-      pubDate: item.pubDate - skew
+      pubDate: item.pubDate != null && !isNaN(item.pubDate) ? item.pubDate - skew : null
     }));
   }
   return items;
@@ -585,10 +598,20 @@ function normalizeFeedDates(items) {
 // TRANSLATION ENGINE (Cloudflare Workers AI via /api/translate, cached in localStorage)
 const translationCache = JSON.parse(localStorage.getItem('newsfeed_translation_cache') || '{}');
 const SERVER_TRANSLATION_TARGET = 'en';
+const MAX_CLIENT_TRANSLATION_CACHE = 2000;
 let translationFetchInFlight = false;
 
 function saveTranslationCache() {
   try {
+    const keys = Object.keys(translationCache);
+    if (keys.length > MAX_CLIENT_TRANSLATION_CACHE) {
+      const keep = keys.slice(keys.length - Math.floor(MAX_CLIENT_TRANSLATION_CACHE / 2));
+      const pruned = {};
+      for (const k of keep) pruned[k] = translationCache[k];
+      for (const k of keys) {
+        if (!pruned[k]) delete translationCache[k];
+      }
+    }
     localStorage.setItem('newsfeed_translation_cache', JSON.stringify(translationCache));
   } catch (e) {
     console.warn('Could not persist translation cache:', e.message);
@@ -891,13 +914,38 @@ function renderSummary(data) {
   regions.forEach((entry) => {
     if (!entry || typeof entry.region !== 'string') return;
     const details = document.createElement('details');
-    details.className = 'group rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2';
+    details.className = 'rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2';
 
     const head = document.createElement('summary');
     head.className = 'flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-100';
     const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
-    head.innerHTML = `<span class="text-sky-300">${escapeHtml(entry.region)}</span><span class="text-xs font-normal text-slate-400">${bullets.length + (entry.lead ? 1 : 0)} points</span>`;
+
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('class', 'h-3.5 w-3.5 text-sky-400 transition-transform duration-200 shrink-0');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>';
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'flex items-center gap-2';
+    titleSpan.appendChild(icon);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'text-sky-300 font-bold';
+    nameSpan.textContent = entry.region;
+    titleSpan.appendChild(nameSpan);
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'text-xs font-normal text-slate-400';
+    countSpan.textContent = `${bullets.length + (entry.lead ? 1 : 0)} points`;
+
+    head.append(titleSpan, countSpan);
     details.appendChild(head);
+
+    details.addEventListener('toggle', () => {
+      icon.classList.toggle('rotate-90', details.open);
+    });
 
     const body = document.createElement('div');
     body.className = 'mt-2 space-y-2';
@@ -1024,6 +1072,12 @@ function openSettingsModal() {
 function closeSettingsModal() {
   settingsModal.classList.add('hidden');
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && settingsModal && !settingsModal.classList.contains('hidden')) {
+    closeSettingsModal();
+  }
+});
 
 function renderSourcesList() {
   sourcesCountText.textContent = `${enabledSourceIds.size} of ${ALL_SOURCES.length} outlets active`;

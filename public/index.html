@@ -136,7 +136,7 @@
         </button>
 
         <!-- View Mode Toggle Button (Tiles / Ticker) -->
-        <button id="btn-view-toggle" title="Toggle Layout (Ticker / Tiles)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60 active:scale-95 flex items-center justify-center">
+        <button id="btn-view-toggle" title="Toggle Layout (Ticker / Tiles)" aria-label="Toggle Layout (Ticker / Tiles)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60 active:scale-95 flex items-center justify-center">
           <svg id="icon-view-tiles" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
           </svg>
@@ -226,13 +226,13 @@
   </div>
 
   <!-- Sources Settings Modal -->
-  <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+  <div id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-y-auto sm:overflow-hidden flex flex-col max-h-[90vh]">
 
       <!-- Modal Header -->
       <div class="shrink-0 p-5 border-b border-slate-800 flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-bold text-white">Choose Your News Favorites</h2>
+          <h2 id="settings-modal-title" class="text-lg font-bold text-white">Choose Your News Favorites</h2>
           <p id="sources-count-text" class="text-xs text-slate-400">Manage active sources</p>
         </div>
         <button id="btn-modal-close" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition">

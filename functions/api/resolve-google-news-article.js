@@ -22,11 +22,26 @@ export async function onRequestGet({ request }) {
       redirect: "follow",
       signal: AbortSignal.timeout(10000),
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Newsfeed/1.0)",
-        Accept: "text/html,application/xhtml+xml"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
       }
     });
-    const resolvedUrl = new URL(response.url);
+    let resolvedUrl = new URL(response.url);
+
+    if (resolvedUrl.hostname.endsWith("google.com")) {
+      const html = await response.text();
+      const match = html.match(/data-n-au="([^"]+)"/) ||
+        html.match(/<a\b[^>]*data-n-a-u="([^"]+)"/i) ||
+        html.match(/c-wiz[^>]*<a\b[^>]*href="([^"]+)"/i);
+      if (match) {
+        try {
+          const parsed = new URL(match[1]);
+          if (["http:", "https:"].includes(parsed.protocol) && !parsed.hostname.endsWith("google.com")) {
+            resolvedUrl = parsed;
+          }
+        } catch {}
+      }
+    }
 
     if (
       !response.ok ||
