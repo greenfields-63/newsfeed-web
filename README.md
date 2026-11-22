@@ -13,14 +13,18 @@ This project is a real-time breaking news aggregator and commentary platform. Th
 - `web/functions/`: Cloudflare Pages serverless functions (RSS fetching, news snapshot API, translation API, summary API, Google News article resolver)
 - `web/news-worker/`: Background worker scripts (snapshot cron ×3 groups, publisher cron)
 
-## 🌍 English Translation (Workers AI)
+## 🌍 English Translation & Instant Rendering Pipeline (Workers AI)
 - Non-English headlines are translated to English **server-side** by `functions/api/translate.js` using Cloudflare Workers AI (`@cf/google/gemma-4-26b-a4b-it`, thinking disabled).
+- **Instant ~1-Second UI Rendering Pipeline:**
+  1. **Synchronous Cache Application:** As XML feeds are parsed in `parseXmlFeed`, `applyTranslationToItem` instantly matches headlines against `translationCache`. Pre-translated titles (warmed up by background cron workers or saved locally) attach immediately—no raw foreign text flash.
+  2. **Unblocked Startup:** `loadSourcesFromGist()` runs asynchronously in parallel on startup rather than delaying initial snapshot fetching.
+  3. **Non-Blocking Background Fetching:** `refreshNews()` renders the UI immediately (~1 second). If rare untranslated headlines exist, `translateItemsForLanguage` fetches translations asynchronously in the background without holding up the UI or loading spinner.
+  4. **Reduced Timeout & Backoff:** Chunk translation timeouts are capped at 10s (with a single 1.5s retry) to ensure background tasks never hang.
 - **Request contract:** `POST /api/translate` with `{ "target": "en", "items": [{ "id", "text", "lang" }] }` → `{ "translations": { "<id>": "<english>" } }`. Only English is supported server-side; other languages are left to the browser's built-in translator (noted in the settings modal).
 - **Batching:** up to 300 items per request, 40 per AI chunk. Client processes chunks concurrently via `Promise.all`; worker processes chunks with concurrency limit of 3.
 - **Caching:** translations are cached in R2 at `newsfeed/translations-cache.json` (hashed text-only keys) **and** in the browser's `localStorage` (`newsfeed_translation_cache`). Client `localStorage` is capped at 2,000 entries with automatic LRU pruning to prevent `QuotaExceededError`. The shared R2 cache ensures each unique headline is translated once for all readers.
-- **Cron warm-up:** each snapshot cron worker (core/google/regional, every 10 min) extracts non-English headlines from freshly fetched feeds and POSTs them to `/api/translate` **before** the snapshot is written to R2, so translations are cached before any user can see the headlines. Warm-up has no per-group headline cap. Each warm-up chunk retries up to 3 times with backoff on failure.
-- **UI:** the "Translate foreign headlines to English" checkbox (`#translate-to-english`) is checked by default on first run; the choice is persisted in `newsfeed_headline_language`. When English is selected, headlines are rendered after translation completes — no flash of foreign text.
-- **Reliability:** if the AI call fails, the endpoint returns cached results only and the UI falls back to original headlines.
+- **Cron warm-up:** each snapshot cron worker (core/google/regional, every 10 min) extracts non-English headlines from freshly fetched feeds and POSTs them to `/api/translate` **before** the snapshot is written to R2, so translations are cached before any user can see the headlines. Warm-up has no per-group headline cap.
+- **UI:** the "Translate foreign headlines to English" checkbox (`#translate-to-english`) is checked by default on first run; the choice is persisted in `newsfeed_headline_language`.
 - **Diagnostics:** `GET /api/translate` returns cache stats (`entries`, `sizeBytes`, `updatedAt`); `POST` with `"debug": true` returns per-request `neurons`.
 
 ## 🧭 Regional AI Briefing
