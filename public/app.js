@@ -101,11 +101,11 @@ const translateToEnglishToggle = document.getElementById('translate-to-english')
 const openArticleTranslatedToggle = document.getElementById('open-article-translated-toggle');
 
 // INITIALIZATION
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   updateViewToggleIcons();
   if (translateToEnglishToggle) translateToEnglishToggle.checked = headlineLanguage === 'en';
-  await loadSourcesFromGist();
   renderFilterBar();
+  void loadSourcesFromGist().then(() => renderFilterBar());
   void loadSummary();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -446,17 +446,24 @@ async function refreshNews() {
       return parseXmlFeed(feed.xml, source);
     });
 
-    let freshHeadlines = filterRecentHeadlines(allItems);
+    cachedHeadlines = filterRecentHeadlines(allItems);
+    saveHeadlines();
+
+    loadingState.classList.add('hidden');
+    renderFilterBar();
+    renderHeadlines();
 
     if (headlineLanguage === 'en') {
-      const updated = await translateItemsForLanguage(freshHeadlines, headlineLanguage);
-      if (updated && updated.length) {
-        freshHeadlines = updated;
-      }
+      void translateItemsForLanguage(cachedHeadlines, headlineLanguage)
+        .then(updated => {
+          if (updated && updated.length) {
+            cachedHeadlines = filterRecentHeadlines(updated);
+            saveHeadlines();
+            renderHeadlines();
+          }
+        })
+        .catch(err => console.warn('Background translation failed:', err));
     }
-
-    cachedHeadlines = filterRecentHeadlines(freshHeadlines);
-    saveHeadlines();
 
     const snapshotDate = new Date(snapshot.generatedAt);
     const updatedAt = Number.isNaN(snapshotDate.getTime())
@@ -685,11 +692,11 @@ async function translateItemsForLanguage(items, targetLanguage) {
           }))
         });
         let data = null;
-        for (let attempt = 0; attempt < 3 && !data; attempt++) {
-          if (attempt) await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 4000 : 10000));
+        for (let attempt = 0; attempt < 2 && !data; attempt++) {
+          if (attempt) await new Promise(resolve => setTimeout(resolve, 1500));
           try {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 45000);
+            const timer = setTimeout(() => controller.abort(), 10000);
             const res = await fetch('/api/translate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
