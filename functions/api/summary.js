@@ -14,7 +14,7 @@ const REGION_ORDER = [
   "Latin America",
   "Global"
 ];
-const MAX_TITLES_PER_REGION = 12;
+const MAX_TITLES_PER_REGION = 25;
 
 const REGION_OF_SOURCE = {
   infobae: "Latin America",
@@ -59,7 +59,7 @@ export async function onRequestGet(context) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/v7/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v8/${slot.key}.json`;
 
   try {
     const cachedObject = await bucket.get(cacheKey);
@@ -218,18 +218,27 @@ function dedupeAndTake(items, limit) {
 
 async function summarizeRegion(env, region, titles) {
   const system = [
-    "You are a concise world-news editor.",
-    `Write a short English briefing for the "${region}" region from the headlines provided.`,
-    "Use ONLY the information written in the headlines. Do not add titles, honorifics, roles, party affiliations, first names, or background facts that are not explicitly stated in a headline.",
-    "Refer to each person and place exactly as the headlines name them (e.g. if a headline says 'Trump', write 'Trump' with no added title or descriptor).",
-    "Keep it neutral and factual. Do not invent or infer details.",
-    "Write the entire briefing in English. Translate every name, organization, quote, and phrase into English; never output Arabic, Hebrew, Cyrillic, Chinese, Japanese, Korean, or any other non-Latin script.",
+    `You are a wire-service news editor writing an executive briefing for the "${region}" region based ONLY on the provided headlines.`,
+    "",
+    "STRICT GROUNDING RULES:",
+    "- Use ONLY facts explicitly stated in the headlines. Do not add titles, roles, first names, background context, or speculation not present in the text.",
+    "- Refer to people, places, and organizations exactly as named in the headlines.",
+    "- Write entirely in English. Translate all foreign-language names, organizations, and terms into English; do not output non-Latin scripts.",
+    "",
+    "EDITORIAL & FORMATTING RULES:",
+    "- Group and merge headlines covering the same event into a single point. Do not repeat information.",
+    "- Prioritize major developments (conflicts, policy shifts, economic moves, disasters) over minor or routine news.",
+    "- Avoid all introductory fluff, meta-commentary, or vague thematic summaries (e.g., never write \"The region saw various developments today\").",
+    "- Write in punchy, active-voice wire style.",
+    "- You may note the apparent significance of a development if it is directly implied by the headline text (e.g., \"policy shift\", \"record high\", \"first time in years\") but do not add external facts.",
+    "",
     "Respond in EXACTLY this plain-text format, with nothing before or after it:",
-    "LEAD: <one or two sentence overview>",
-    "- <bullet 1>",
-    "- <bullet 2>",
-    "- <bullet 3>",
-    "Use 2 to 4 bullets. Plain text only: no JSON, no markdown fences, no extra commentary."
+    "LEAD: <1-2 sentences stating the single most significant development from the headlines>",
+    "- <2nd most important distinct development>",
+    "- <3rd most important distinct development>",
+    "- <4th most important distinct development, if applicable>",
+    "",
+    "Use 2 to 4 bullets. Every bullet must cover a distinct story not already covered in the LEAD. Plain text only: no markdown, no bolding, no JSON."
   ].join("\n");
 
   const user = [
@@ -245,8 +254,8 @@ async function summarizeRegion(env, region, titles) {
           { role: "system", content: system },
           { role: "user", content: user }
         ],
-        temperature: attempt === 0 ? 0.1 : 0,
-        max_tokens: 900
+        temperature: attempt === 0 ? 0.3 : 0,
+        max_tokens: 1500
       });
       const parsed = parseSummaryText(extractResponseText(result));
       if (parsed) {
