@@ -14,7 +14,33 @@ const REGION_ORDER = [
   "Latin America",
   "Global"
 ];
-const MAX_TITLES_PER_REGION = 25;
+const MAX_TITLES_PER_REGION = 12;
+
+const SOURCE_WEIGHTS = {
+  reuters: 3, ap: 3, bbc: 3, cnn: 3, bloomberg: 3,
+  al_arabiya: 2, al_akhbar: 2, an_nahar: 2, jpost: 2, ynet: 2, israel_hayom: 2, times_of_israel: 2, inn: 2,
+  france24: 2, sky: 2, rtve: 2, ria: 2, tass: 2,
+  scmp: 2, caixin: 2, xinhua: 2, the_paper: 2, nhk: 2, amar_ujala: 2,
+  abc: 2, cbs: 2, cnbc: 2, fox: 2, nbc: 2,
+  infobae: 2, abc_australia: 2, sbs: 2, mercopress: 2
+};
+
+const KEYWORD_BOOST = [
+  "attack", "strike", "missile", "drone", "war", "military", "troops", "forces",
+  "election", "vote", "parliament", "congress", "senate", "minister", "president", "prime minister",
+  "policy", "sanction", "treaty", "deal", "agreement", "summit", "talks", "ceasefire",
+  "disaster", "earthquake", "flood", "fire", "explosion", "crash", "killed", "dead", "casualties", "injured",
+  "resign", "resignation", "impeach", "arrest", "indict", "convict", "sentence",
+  "bank", "rate", "inflation", "market", "crash", "record", "surge", "plunge",
+  "court", "ruling", "verdict", "lawsuit", "trial"
+];
+
+const KEYWORD_PENALTY = [
+  "weather", "forecast", "temperature", "rain", "snow",
+  "sports", "match", "game", "tournament", "league", "cup", "score", "goal",
+  "entertainment", "celebrity", "movie", "music", "concert", "festival",
+  "traffic", "commute"
+];
 
 const REGION_OF_SOURCE = {
   infobae: "Latin America",
@@ -59,7 +85,7 @@ export async function onRequestGet(context) {
     return Response.json({ error: "Storage is not configured" }, { status: 503 });
   }
   const slot = getSlotInfo();
-  const cacheKey = `newsfeed/summaries/v8/${slot.key}.json`;
+  const cacheKey = `newsfeed/summaries/v9/${slot.key}.json`;
 
   try {
     const cachedObject = await bucket.get(cacheKey);
@@ -158,7 +184,7 @@ function groupTitlesByRegion(feeds) {
   for (const [sourceId, feed] of Object.entries(feeds)) {
     const region = regionForSource(sourceId);
     if (!region || !feed || typeof feed.xml !== "string") continue;
-    const items = extractFeedItems(feed.xml);
+    const items = extractFeedItems(feed.xml, sourceId);
     if (!items.length) continue;
     const bucketForRegion = grouped[region] || (grouped[region] = []);
     for (const item of items) bucketForRegion.push(item);
@@ -170,7 +196,7 @@ function groupTitlesByRegion(feeds) {
   return grouped;
 }
 
-function extractFeedItems(xml) {
+function extractFeedItems(xml, sourceId) {
   const items = [];
   const blockPattern = /<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/gi;
   let match;
@@ -182,7 +208,7 @@ function extractFeedItems(xml) {
     if (title.length < 8) continue;
     const dateMatch = block.match(/<(pubDate|published|updated)\b[^>]*>([\s\S]*?)<\/\1>/i);
     const time = dateMatch ? Date.parse(dateMatch[2].trim()) : NaN;
-    items.push({ title, time: Number.isFinite(time) ? time : 0 });
+    items.push({ title, time: Number.isFinite(time) ? time : 0, sourceId });
   }
   return items;
 }
@@ -212,7 +238,33 @@ function dedupeAndTake(items, limit) {
     seen.add(key);
     unique.push(item);
   }
-  unique.sort((a, b) => (b.time || 0) - (a.time || 0));
+
+  for (const item of unique) {
+    let score = 0;
+    const lower = item.title.toLowerCase();
+
+    const sourceWeight = SOURCE_WEIGHTS[item.sourceId] || 1;
+    score += sourceWeight * 10;
+
+    for (const kw of KEYWORD_BOOST) {
+      if (lower.includes(kw)) score += 5;
+    }
+    for (const kw of KEYWORD_PENALTY) {
+      if (lower.includes(kw)) score -= 3;
+    }
+
+    if (/\d/.test(item.title)) score += 2;
+    if (item.title.length > 80) score += 1;
+
+    item._score = score;
+    item._time = item.time || 0;
+  }
+
+  unique.sort((a, b) => {
+    if (b._score !== a._score) return b._score - a._score;
+    return b._time - a._time;
+  });
+
   return unique.slice(0, limit).map(item => item.title);
 }
 
@@ -223,7 +275,7 @@ async function summarizeRegion(env, region, titles) {
     "STRICT GROUNDING RULES:",
     "- Use ONLY facts explicitly stated in the headlines. Do not add titles, roles, first names, background context, or speculation not present in the text.",
     "- Refer to people, places, and organizations exactly as named in the headlines.",
-    "- Write entirely in English. Translate all foreign-language names, organizations, and terms into English; do not output non-Latin scripts.",
+    "- Write entirely in English. Translate all foreign-language names, organizations, and terms into English. CRITICAL: never output Arabic, Hebrew, Cyrillic, Chinese, Japanese, Korean, Hindi, or any other non-Latin script. If a headline is in a non-Latin script, render it fully in English.",
     "",
     "EDITORIAL & FORMATTING RULES:",
     "- Group and merge headlines covering the same event into a single point. Do not repeat information.",
@@ -254,13 +306,23 @@ async function summarizeRegion(env, region, titles) {
           { role: "system", content: system },
           { role: "user", content: user }
         ],
-        temperature: attempt === 0 ? 0.3 : 0,
-        max_tokens: 1500
+        temperature: attempt === 0 ? 0.2 : 0,
+        max_tokens: 900
       });
       const parsed = parseSummaryText(extractResponseText(result));
       if (parsed) {
-        if (hasNonLatinText(parsed) && attempt < 2) {
+        if (hasNonLatinText(parsed)) {
           console.warn(`Summary for ${region} attempt ${attempt + 1} contained non-Latin text; retrying`);
+          if (attempt < 2) continue;
+          const cleaned = stripNonLatin(parsed);
+          if (cleaned.lead || cleaned.bullets.length) {
+            return {
+              region,
+              lead: cleaned.lead || cleaned.bullets[0] || "",
+              bullets: cleaned.lead ? cleaned.bullets : cleaned.bullets.slice(1),
+              sourceCount: titles.length
+            };
+          }
           continue;
         }
         return {
@@ -283,6 +345,18 @@ const NON_LATIN_PATTERN = /[\u0370-\u03FF\u0400-\u052F\u0590-\u05FF\u0600-\u06FF
 function hasNonLatinText(parsed) {
   const text = [parsed.lead, ...(parsed.bullets || [])].join(" ");
   return NON_LATIN_PATTERN.test(text);
+}
+
+function stripNonLatin(parsed) {
+  const clean = (text) => String(text || "")
+    .replace(new RegExp(NON_LATIN_PATTERN.source, "g"), "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const lead = clean(parsed.lead);
+  const bullets = (parsed.bullets || [])
+    .map(b => clean(b))
+    .filter(b => b.length > 3);
+  return { lead, bullets };
 }
 
 function parseSummaryText(text) {
